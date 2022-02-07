@@ -60,9 +60,18 @@ public class FileStorage {
     int PAGE_SIZE = 32;
     byte[] data = new byte[PAGE_SIZE];
     try {
-      Files.createFile(Paths.get(filePath));
+      Files.createFile(Paths.get(INDEX_DIR + "/" + filePath));
       Files.write(Paths.get(filePath), data);
       System.out.println("file created successfully");
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public static void deleteBTree(String filePath) {
+    try {
+      Files.delete(Paths.get(INDEX_DIR + "/" + filePath));
+      System.out.println("index file deleted successfully");
     } catch (IOException e) {
       e.printStackTrace();
     }

@@ -66,8 +66,7 @@ public class BTree {
       return null;
     } else {
       BTree tree = new BTree(indexName);
-      // save initialized tree to storage
-      // Files.write(Paths.get("storage/index" + indexName), tree.getBinary());
+      FileStorage.initializeBTree(indexName);
       return tree;
     }
   }
@@ -82,6 +81,7 @@ public class BTree {
     if (leafPageID == -1) {
       // TODO: assign kv to leaf page herez
       LeafPage leafPage = new LeafPage();
+      leafPage.insert(key, value);
       value = leafPage.pageId;
       this.pageCache.assignNewPage(leafPage);
 
@@ -102,7 +102,7 @@ public class BTree {
         result = parentPage.insert(key, childPageID);
       }
     } else {
-      LeafPage targetPage = (LeafPage) this.pageCache.getPage(leafPageID, false);
+      LeafPage targetPage = (LeafPage) this.pageCache.getPage(leafPageID, true);
       // propagate the insertion of value to leaf node.
       // TODO: この辺はもう一度propagationのロジックを各員してロジックの組み分けが必要
       // result {isSucceed, propagateKey}

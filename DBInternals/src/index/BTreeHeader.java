@@ -12,6 +12,40 @@ public class BTreeHeader {
   public BTreeHeader() {
     this.isLeaf.add(false);
     this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
+    this.isLeaf.add(true);
   }
 
   public boolean isLeafNode(int pageID) {
