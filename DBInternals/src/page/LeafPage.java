@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -20,7 +19,6 @@ public class LeafPage extends Page {
   private Map<Integer, KeyValueCell> kvMap = new TreeMap<Integer, KeyValueCell>();
   private byte[] pageBinary;
   private PageHeader header;
-  public int pageId;
   private Map<Integer, KeyValueCell> keyValueCellMap;
   private List<Integer> offsets;
   // freeになったセルとその大きさを記録する
@@ -28,8 +26,8 @@ public class LeafPage extends Page {
 
   public LeafPage() {
     this.header = new PageHeader();
-    this.pageId = BTree.assignPageId();
-    this.keyValueCellMap = new HashMap<Integer, KeyValueCell>();
+    super.pageId = BTree.assignPageId();
+    this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
     this.offsets = new ArrayList<Integer>();
   }
 
@@ -55,10 +53,10 @@ public class LeafPage extends Page {
     }
 
     // parse cells
-    this.keyValueCellMap = new HashMap<Integer, KeyValueCell>();
+    this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
     for (int offset : this.offsets) {
       KeyValueCell cell = new KeyValueCell(pageBinary, offset);
-      this.keyValueCellMap.put(offset, cell);
+      this.keyValueCellMap.put(cell.getKey(), cell);
     }
   }
 
@@ -96,7 +94,7 @@ public class LeafPage extends Page {
       this.header.cell_start_offset -= cell.getBinary().length;
       this.offsets.add(this.header.cell_start_offset);
       Collections.sort(this.offsets);
-      keyValueCellMap.put(key, cell);
+      this.keyValueCellMap.put(key, cell);
       return new int[] {0};
     } else {
       int propatationKey = this.splitPage(key, value);
@@ -117,21 +115,9 @@ public class LeafPage extends Page {
     return keySet.get(keySet.size() / 2);
   }
 
+  // TODO:insertした時にoffsetのソートが保てていないので２分探索ができていない
   public int getValue(int key) {
-    int ok = 0;
-    int ng = this.offsets.size();
-
-    while (Math.abs(ok - ng) > 1) {
-      int mid = (ok + ng) / 2;
-      KeyValueCell midCell = this.keyValueCellMap.get(this.offsets.get(mid));
-      int midKey = midCell.getKey();
-      if (midKey < key) {
-        ok = mid;
-      } else {
-        ng = mid;
-      }
-    }
-    return this.keyValueCellMap.get(this.offsets.get(ok)).getValue();
+    return this.keyValueCellMap.get(key).getValue();
   }
 
 

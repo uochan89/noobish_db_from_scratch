@@ -3,7 +3,6 @@ package page;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -17,12 +16,13 @@ public class NoneLeafPage extends Page {
   private static final int HEADER_SIZE = 10;
   private PageHeader header;
   public int pageId;
-  private Map<Integer, KeyCell> keyCellMap;
+  // offset, keyCell
+  private TreeMap<Integer, KeyCell> keyCellMap;
   private List<Integer> offsets;
 
   // TODO:freeになったセルとその大きさを記録する
   private int[][] availabilityList;
-  private Map<Integer, KeyCell> kvMap = new TreeMap<Integer, KeyCell>();
+  // private Map<Integer, KeyCell> kvMap = new TreeMap<Integer, KeyCell>();
 
   // constructor for splitting
   public NoneLeafPage(Map<Integer, KeyCell> kvMap) {
@@ -50,10 +50,10 @@ public class NoneLeafPage extends Page {
     }
 
     // parse cells
-    this.keyCellMap = new HashMap<Integer, KeyCell>();
+    this.keyCellMap = new TreeMap<Integer, KeyCell>();
     for (int offset : this.offsets) {
       KeyCell cell = new KeyCell(pageBinary, offset);
-      this.keyCellMap.put(offset, cell);
+      this.keyCellMap.put(cell.getKey(), cell);
     }
   }
 
@@ -68,20 +68,15 @@ public class NoneLeafPage extends Page {
     if (this.offsets.size() == 0) {
       return -1;
     }
-    int ok = 0;
-    int ng = this.offsets.size();
 
-    while (Math.abs(ok - ng) > 1) {
-      int mid = (ok + ng) / 2;
-      KeyCell midCell = this.keyCellMap.get(this.offsets.get(mid));
-      int midKey = midCell.getKey();
-      if (midKey < key) {
-        ok = mid;
-      } else {
-        ng = mid;
-      }
+    // TODO:ここで新しいkeyが入る場所を探そうとするとnpになる
+    // でもこうしてしまうと私い
+    Integer lowerKey = this.keyCellMap.floorKey(key);
+    if (lowerKey == null) {
+      return -1;
+    } else {
+      return this.keyCellMap.get(lowerKey).getPageId();
     }
-    return this.keyCellMap.get(this.offsets.get(ok)).getPageId();
   }
 
   public int createChildLeafNode(int key) {
@@ -114,10 +109,10 @@ public class NoneLeafPage extends Page {
 
   private int splitPage(int key, int value) {
     Map<Integer, KeyCell> newKvMap = new TreeMap<Integer, KeyCell>();
-    List<Integer> keySet = new ArrayList<Integer>(this.kvMap.keySet());
+    List<Integer> keySet = new ArrayList<Integer>(this.keyCellMap.keySet());
     for (int i = 0; i < keySet.size() / 2; i++) {
       int j = i + keySet.size() / 2;
-      newKvMap.put(keySet.get(j), this.kvMap.get(keySet.get(j)));
+      newKvMap.put(keySet.get(j), this.keyCellMap.get(keySet.get(j)));
     }
 
     NoneLeafPage newPage = new NoneLeafPage(newKvMap);

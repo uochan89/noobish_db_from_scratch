@@ -147,7 +147,7 @@ public class BTree {
   private int getLeafPage(int key) {
     int pageId = BTree.ROOT_PAGE_ID;
     int childPageId = 0;
-    while (!this.isLeafNode(pageId)) {
+    while (pageId != -1 && !this.isLeafNode(pageId)) {
       NoneLeafPage page = null;
       page = (NoneLeafPage) this.pageCache.getPage(pageId, false);
       childPageId = page.getChildPageId(key);
