@@ -1,7 +1,10 @@
 package page;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.lang3.SerializationUtils;
+import others.BinaryUtil;
 
 public class KeyValueCell extends Cell {
 
@@ -29,24 +32,37 @@ public class KeyValueCell extends Cell {
         KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH + key_size - 1));
   }
 
+  /**
+   * key_size value_size key_bytes datarecord_bytes
+   * 
+   */
   public byte[] getBinary() {
-    /**
-     * // convert to binary byte[] key = SerializationUtils.serialize(this.key); byte[] key_size =
-     * SerializationUtils.serialize(key.length); byte[] value =
-     * SerializationUtils.serialize(this.value); byte[] value_size =
-     * SerializationUtils.serialize(value.length);
-     * 
-     * // apply zero-padding to fixed-size byte[] padded_key_size = Utils.applyZeroPadding(key_size,
-     * KeyValueCell.KEY_SIZE_LENGTH); byte[] padded_value_size = Utils.applyZeroPadding(key_size,
-     * KeyValueCell.VALUE_SIZE_LENGTH);
-     **/
 
-    byte[] padded_key_size = new byte[KeyValueCell.KEY_SIZE_LENGTH];
-    byte[] padded_value_size = new byte[KeyValueCell.VALUE_SIZE_LENGTH];
+    List<byte[]> data = new ArrayList<byte[]>();
 
-    // append for cell binary
-    // byte[] cellBinary =
-    // new byte[KeyValueCell.KEY_SIZE_LENGTH + KeyValueCell.VALUE_SIZE_LENGTH + key.length];
+    byte[] key_bytes = BinaryUtil.intToBytes(key);
+    byte[] datarecord_bytes = BinaryUtil.intToBytes(value);
+    byte[] key_size = BinaryUtil.intToBytes(key_bytes.length);
+    byte[] value_size = BinaryUtil.intToBytes(datarecord_bytes.length);
+
+    data.add(key_size);
+    data.add(value_size);
+    data.add(key_bytes);
+    data.add(datarecord_bytes);
+
+    byte[] binaryData = BinaryUtil.concatByteArrays(data);
+    return binaryData;
+  }
+
+  public int getValue() {
+    return this.value;
+  }
+
+  public int getKey() {
+    return this.key;
+  }
+
+  private void idk() {
     byte[] cellBinary = new byte[KeyValueCell.KEY_SIZE_LENGTH + KeyValueCell.VALUE_SIZE_LENGTH + 2];
 
     int i = 0;
@@ -63,14 +79,5 @@ public class KeyValueCell extends Cell {
     cellBinary[i] = (byte) value;
     i++;
 
-    return cellBinary;
-  }
-
-  public int getValue() {
-    return this.value;
-  }
-
-  public int getKey() {
-    return this.key;
   }
 }
