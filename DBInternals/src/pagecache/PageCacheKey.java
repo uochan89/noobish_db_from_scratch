@@ -8,6 +8,12 @@ public class PageCacheKey<K1, K2, K3> {
   public K2 key2;
   public K3 key3;
 
+  /**
+   * 
+   * @param key1 pageID
+   * @param key2 Page
+   * @param key3 isLeaf
+   */
   public PageCacheKey(K1 key1, K2 key2, K3 key3) {
     this.key1 = key1;
     this.key2 = key2;

@@ -3,7 +3,6 @@ package page;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.lang3.SerializationUtils;
 import others.BinaryUtil;
 
 public class KeyValueCell extends Cell {
@@ -22,12 +21,12 @@ public class KeyValueCell extends Cell {
   KeyValueCell(byte[] pageBinary, int offset) {
     byte[] cellBinary =
         Arrays.copyOfRange(pageBinary, offset, offset + KeyValueCell.KEY_SIZE_LENGTH - 1);
-    int key_size = SerializationUtils
-        .deserialize(Arrays.copyOfRange(pageBinary, 0, KeyValueCell.KEY_SIZE_LENGTH - 1));
+    int key_size =
+        BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, 0, KeyValueCell.KEY_SIZE_LENGTH - 1));
     // this.pageId =
     // SerializationUtils.deserialize(Arrays.copyOfRange(pageBinary, KeyValueCell.KEY_SIZE_LENGTH,
     // KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH - 2));
-    this.key = SerializationUtils.deserialize(Arrays.copyOfRange(pageBinary,
+    this.key = BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary,
         KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH,
         KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH + key_size - 1));
   }
@@ -44,6 +43,7 @@ public class KeyValueCell extends Cell {
     byte[] datarecord_bytes = BinaryUtil.intToBytes(value);
     byte[] key_size = BinaryUtil.intToBytes(key_bytes.length);
     byte[] value_size = BinaryUtil.intToBytes(datarecord_bytes.length);
+
 
     data.add(key_size);
     data.add(value_size);

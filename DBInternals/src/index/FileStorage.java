@@ -23,11 +23,11 @@ public class FileStorage {
     return readData;
   }
 
-  public static void updateByteData(String indexName, byte[] data, int offset) throws IOException {
+  public static void updateBTree(String indexName, byte[] data, int offset) throws IOException {
 
     String filePath = FileStorage.INDEX_DIR + "/" + indexName;
     if (!Files.exists(Paths.get(filePath))) {
-      initializeBTree(filePath);
+      initializeBTree(indexName);
     }
 
     int size = data.length;
@@ -36,6 +36,7 @@ public class FileStorage {
     // only if i have to apppend page. not updating page
 
     // original.length - 1 < offset
+    // TODO random access
     if (true) {
       // append
       byte[] appended = new byte[original.length + data.length];
@@ -56,13 +57,12 @@ public class FileStorage {
 
   }
 
-  public static void initializeBTree(String filePath) {
-    int PAGE_SIZE = 32;
+  public static void initializeBTree(String indexName) {
+    int PAGE_SIZE = 4000;
     byte[] data = new byte[PAGE_SIZE];
     try {
-      Files.createFile(Paths.get(INDEX_DIR + "/" + filePath));
-      Files.write(Paths.get(filePath), data);
-      System.out.println("file created successfully");
+      Files.createFile(Paths.get(INDEX_DIR + "/" + indexName));
+      Files.write(Paths.get(indexName), data);
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -71,7 +71,6 @@ public class FileStorage {
   public static void deleteBTree(String filePath) {
     try {
       Files.delete(Paths.get(INDEX_DIR + "/" + filePath));
-      System.out.println("index file deleted successfully");
     } catch (IOException e) {
       e.printStackTrace();
     }

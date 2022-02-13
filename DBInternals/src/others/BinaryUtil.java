@@ -44,4 +44,21 @@ public class BinaryUtil {
     // short num = wrapped.getShort();
     // return num;
   }
+
+  public static String bytesToBinary(byte[] data) {
+    String res = "";
+    for (byte x : data) {
+      res += String.format("%8s", Integer.toBinaryString(x & 0xFF)).replace(' ', '0');
+    }
+    return res;
+  }
+
+  public static void consoleOutByByte(byte[] binaryFormattedData) {
+    String x = BinaryUtil.bytesToBinary(binaryFormattedData);
+    int i = 0;
+    while (i < x.length()) {
+      System.out.println(x.substring(i, i + 8));
+      i += 8;
+    }
+  }
 }

@@ -2,9 +2,12 @@ package pagecache;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import index.BTree;
 import index.FileStorage;
 import page.LeafPage;
@@ -47,7 +50,7 @@ public class PageCache {
           public Page load(PageCacheKey<String, Integer, Boolean> key) throws Exception {
             // pageIdに合致するページをストレージから取得する
             // cacheをtree毎に作成するかどうか。index間で共有するならkeyをpageID以外にしないといけない
-            System.out.println("cache data from storage");
+            System.out.println("read data from storage pageID : " + key.key2);
             byte[] pageBinary = BTree.getPageBinary(key.key1, key.key2);
             if (key.key3) {
               return new LeafPage(pageBinary);
@@ -57,7 +60,24 @@ public class PageCache {
           }
         };
 
-    cache = CacheBuilder.newBuilder().maximumSize(10).build(loader);
+    RemovalListener listener = new RemovalListener<PageCacheKey<String, Integer, Boolean>, Page>() {
+      @Override
+      public void onRemoval(
+          RemovalNotification<PageCacheKey<String, Integer, Boolean>, Page> notification) {
+        String indexName = notification.getKey().key1;
+        byte[] pageBinary = notification.getValue().getBinary();
+        int pageID = notification.getKey().key2;
+        try {
+          FileStorage.updateBTree(indexName, pageBinary, BTree.getPageIdOffset(pageID));
+          System.out.println("page persisted. pageID : " + pageID);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    };
+
+    cache = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.SECONDS)
+        .removalListener(listener).build(loader);
   }
 
   public void assignNewPage(Page page) {
@@ -71,7 +91,7 @@ public class PageCache {
     page = this.getPage(pageID, isLeaf);
     int pageOffset = BTree.getPageIdOffset(pageID);
     try {
-      FileStorage.updateByteData(this.treeName, page.getBinary(), pageOffset);
+      FileStorage.updateBTree(this.treeName, page.getBinary(), pageOffset);
     } catch (IOException e) {
       e.printStackTrace();
     }

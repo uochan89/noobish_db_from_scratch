@@ -17,9 +17,9 @@ public class PageHeader {
   // {space_size, right_offset}
   int[][] availableList = new int[][] {{PAGE_SIZE - 10, PAGE_SIZE}};
   int tmp_header_offset = 10;
-  int offset_count;
+  int offset_count = 1;
   int free_space_left_index = 400;
-  int free_space_right_index;
+  int free_space_right_index = PAGE_SIZE;
   int cell_start_offset = 3999;
   boolean isLeafPage;
   int parentPageId;
@@ -37,6 +37,9 @@ public class PageHeader {
     leftOffset += PageHeader.OFFSET_COUNT;
   }
 
-
+  public byte[] getBinary() {
+    byte[] binary = new byte[this.tmp_header_offset];
+    return binary;
+  }
 
 }

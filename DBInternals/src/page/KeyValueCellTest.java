@@ -25,8 +25,10 @@ class KeyValueCellTest {
 
   @Test
   void testGetBinaryAndPageConstructor() {
-    KeyValueCell cell = new KeyValueCell(1000, 216310283);
+    KeyValueCell cell = new KeyValueCell(3, 5);
     byte[] binary = cell.getBinary();
+
+    BinaryUtil.consoleOutByByte(binary);
 
     int i = 0;
     byte[] key_size = Arrays.copyOfRange(binary, i, i + 4);

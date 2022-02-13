@@ -131,7 +131,7 @@ public class BTree {
   public static byte[] getPageBinary(String indexName, int pageID) {
     int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE + pageID;
     try {
-      return FileStorage.getByteData(indexName, from, pageID);
+      return FileStorage.getByteData(indexName, from, BTree.PAGE_SIZE);
     } catch (IOException e) {
       e.printStackTrace();
     }
