@@ -68,7 +68,7 @@ public class PageCache {
         byte[] pageBinary = notification.getValue().getBinary();
         int pageID = notification.getKey().key2;
         try {
-          FileStorage.updateBTree(indexName, pageBinary, BTree.getPageIdOffset(pageID));
+          FileStorage.updateFile(indexName, pageBinary, BTree.getPageIdOffset(pageID));
           System.out.println("page persisted. pageID : " + pageID);
         } catch (IOException e) {
           e.printStackTrace();
@@ -91,7 +91,7 @@ public class PageCache {
     page = this.getPage(pageID, isLeaf);
     int pageOffset = BTree.getPageIdOffset(pageID);
     try {
-      FileStorage.updateBTree(this.treeName, page.getBinary(), pageOffset);
+      FileStorage.updateFile(this.treeName, page.getBinary(), pageOffset);
     } catch (IOException e) {
       e.printStackTrace();
     }

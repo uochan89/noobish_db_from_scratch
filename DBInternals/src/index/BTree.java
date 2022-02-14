@@ -56,8 +56,8 @@ public class BTree {
   public static BTree getBTree(String indexName) {
     if (BTree.indexExists(indexName)) {
       try {
-        byte[] headerBinary = FileStorage.getByteData(indexName, 0, 0);
-        byte[] tailBinary = FileStorage.getByteData(indexName, 0, 0);
+        byte[] headerBinary = FileStorage.readFile(indexName, 0, 0);
+        byte[] tailBinary = FileStorage.readFile(indexName, 0, 0);
         return new BTree(indexName, headerBinary, tailBinary);
       } catch (IOException e) {
         // TODO Auto-generated catch block
@@ -129,9 +129,9 @@ public class BTree {
 
   // TODO: refine erro handling
   public static byte[] getPageBinary(String indexName, int pageID) {
-    int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE + pageID;
+    int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE * pageID;
     try {
-      return FileStorage.getByteData(indexName, from, BTree.PAGE_SIZE);
+      return FileStorage.readFile(indexName, from, BTree.PAGE_SIZE);
     } catch (IOException e) {
       e.printStackTrace();
     }

@@ -40,24 +40,22 @@ class FileStorageTest {
     byte[] db = BinaryUtil.intToBytes(data);
     Files.write(PATH, db);
     System.out.println(db.length);
-    byte[] persistedData = FileStorage.getByteData(FILE_NAME, 0, db.length);
+    byte[] persistedData = FileStorage.readFile(FILE_NAME, 0, db.length);
     assertArrayEquals(db, persistedData);
   }
 
   @Test
-  void testCreateFile() {
+  void testFileCreationAndRead() {
     byte[] data = new byte[] {12, 3, 123, 12};
     try {
-      FileStorage.updateBtree(FILE_NAME, data, 0);
+      FileStorage.updateFile(FILE_NAME, data, 1000);
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     byte[] persistedData = null;
     try {
-      persistedData = FileStorage.getByteData(FILE_NAME, 0, 4000);
+      persistedData = FileStorage.readFile(FILE_NAME, 1000, data.length);
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     for (int i = 0; i < data.length; i++) {

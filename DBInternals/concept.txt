@@ -1,0 +1,6 @@
+Since we only have limited amount of time, I should decide what facility to support and not to...
+
+ - this RDBMS only supports page size equals to block size. This can be lead to some restriction of facility and preformance.
+   However, this will ease implementation of binary maintenance. With this restriction, writing and reading page at once does not cause any cost because after all a block of storage has to be read or write.
+   This enable developer to use fancy libraries and structure supported by java library, which makes implementation easier and not trying to make the most efficiend RDBMS that I can implement.
+   Since this project is to learn the implementation of RDBMS as whole, I hope this compromise is accepted. 

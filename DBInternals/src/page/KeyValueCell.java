@@ -18,17 +18,17 @@ public class KeyValueCell extends Cell {
     this.value = value;
   }
 
-  KeyValueCell(byte[] pageBinary, int offset) {
-    byte[] cellBinary =
-        Arrays.copyOfRange(pageBinary, offset, offset + KeyValueCell.KEY_SIZE_LENGTH - 1);
+  KeyValueCell(byte[] pageBinary, int cellOffset) {
+    int i = cellOffset + 1;
     int key_size =
-        BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, 0, KeyValueCell.KEY_SIZE_LENGTH - 1));
-    // this.pageId =
-    // SerializationUtils.deserialize(Arrays.copyOfRange(pageBinary, KeyValueCell.KEY_SIZE_LENGTH,
-    // KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH - 2));
-    this.key = BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary,
-        KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH,
-        KeyValueCell.VALUE_SIZE_LENGTH + KeyValueCell.KEY_SIZE_LENGTH + key_size - 1));
+        BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, i, i + KeyValueCell.KEY_SIZE_LENGTH));
+    i += KeyValueCell.KEY_SIZE_LENGTH;
+    int value_size = BinaryUtil
+        .bytesToInt(Arrays.copyOfRange(pageBinary, i, i + KeyValueCell.VALUE_SIZE_LENGTH));
+    i += KeyValueCell.VALUE_SIZE_LENGTH;
+    this.key = BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, i, i + key_size));
+    i += key_size;
+    this.value = BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, i, i + value_size));
   }
 
   /**
