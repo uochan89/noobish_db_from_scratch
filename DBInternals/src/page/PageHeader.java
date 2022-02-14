@@ -1,6 +1,9 @@
 package page;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import others.BinaryUtil;
 
 public class PageHeader {
 
@@ -16,8 +19,7 @@ public class PageHeader {
   // members that would be needed
   // {space_size, right_offset}
   int[][] availableList = new int[][] {{PAGE_SIZE - 10, PAGE_SIZE}};
-  int tmp_header_offset = 10;
-  int offset_count = 1;
+  int tmp_header_offset = 4;
   int free_space_left_index = 400;
   int free_space_right_index = PAGE_SIZE;
   int cell_start_offset = 3999;
@@ -28,18 +30,22 @@ public class PageHeader {
   PageHeader() {}
 
   PageHeader(byte[] pageBinary) {
-    int leftOffset = 0;
-    byte[] pageIDByte = Arrays.copyOfRange(pageBinary, leftOffset, PageHeader.PAGE_ID);
-    // this.pageID = Byte.toUnsignedInt(pageIDByte);
-    leftOffset += PageHeader.PAGE_ID;
-    // byte[] offsetCount = Arrays.copyOfRange(pageBinary, leftOffset, PageHeader.OFFSET_COUNT);
-    // this.offsetCount = Byte.toUnsignedInt(offsetCount);
-    leftOffset += PageHeader.OFFSET_COUNT;
+    this.offsetCount = BinaryUtil.bytesToInt(Arrays.copyOfRange(pageBinary, 0, 4));
   }
 
   public byte[] getBinary() {
-    byte[] binary = new byte[this.tmp_header_offset];
-    return binary;
+
+    List<byte[]> data = new ArrayList<byte[]>();
+
+    byte[] offset_bytes = BinaryUtil.intToBytes(this.offsetCount);
+
+    data.add(offset_bytes);
+
+
+    byte[] binaryData = BinaryUtil.concatByteArrays(data);
+    BinaryUtil.consoleOutByByte(binaryData);
+    return binaryData;
+
   }
 
 }

@@ -69,7 +69,7 @@ public class PageCache {
         int pageID = notification.getKey().key2;
         try {
           FileStorage.updateFile(indexName, pageBinary, BTree.getPageIdOffset(pageID));
-          System.out.println("page persisted. pageID : " + pageID);
+          System.out.println("write data to storage. pageID : " + pageID);
         } catch (IOException e) {
           e.printStackTrace();
         }

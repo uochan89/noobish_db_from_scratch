@@ -47,7 +47,7 @@ public class LeafPage extends Page {
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
     this.offsets = new ArrayList<Integer>();
-    for (int i = 0; i < this.header.offset_count; i++) {
+    for (int i = 0; i < this.header.offsetCount; i++) {
       int t = this.header.tmp_header_offset;
       byte[] offset = Arrays.copyOfRange(pageBinary, t, t + LeafPage.OFFSET_SIZE);
       this.offsets.add(BinaryUtil.bytesToInt(offset));
@@ -96,6 +96,7 @@ public class LeafPage extends Page {
     if (hasEnoughSpace) {
       this.header.cell_start_offset -= cell.getBinary().length;
       this.offsets.add(this.header.cell_start_offset);
+      this.header.offsetCount += 1;
       Collections.sort(this.offsets);
       this.keyValueCellMap.put(key, cell);
       return new int[] {0};

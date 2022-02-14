@@ -12,10 +12,8 @@ import pagecache.PageCache;
 public class BTree {
 
   public static void main(String[] args) {
-    BTree tree = BTree.getBTree("omega");
+    BTree tree = BTree.getBTree("new_omega");
     tree.insert(11, 7);
-    int res = tree.read(11);
-    System.out.println(res);
     System.out.println("sucess");
   }
 
@@ -87,8 +85,10 @@ public class BTree {
 
       // propagate the pageID of new leaf page to parents
       int parentPageID = breadCrumbs.pop();
+      System.out.println("parent : " + parentPageID);
       NoneLeafPage targetPage = (NoneLeafPage) this.pageCache.getPage(parentPageID, false);
       // result {isSucceed, propagateKey}
+      System.out.println("korewoireru : " + value);
       int[] result = targetPage.insert(key, value);
 
       while (result[0] != 0) {
@@ -123,6 +123,7 @@ public class BTree {
 
   public int read(int key) {
     int leafPageID = this.getLeafPage(key);
+    System.out.println("leafPageID : " + leafPageID);
     LeafPage page = (LeafPage) this.pageCache.getPage(leafPageID, true);
     return page.getValue(key);
   }
@@ -130,6 +131,7 @@ public class BTree {
   // TODO: refine erro handling
   public static byte[] getPageBinary(String indexName, int pageID) {
     int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE * pageID;
+    System.out.println("from : " + from);
     try {
       return FileStorage.readFile(indexName, from, BTree.PAGE_SIZE);
     } catch (IOException e) {
