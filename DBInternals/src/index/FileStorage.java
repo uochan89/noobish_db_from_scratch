@@ -14,8 +14,6 @@ public class FileStorage {
 
   // read byte from offset to offset+size from file
   public static byte[] readFile(String fileName, int offset, int size) throws IOException {
-    System.out.println("read from storage");
-    System.out.println(fileName + " : " + offset + " : " + size);
     File file = new File(INDEX_DIR + "/" + fileName);
     byte[] readData = new byte[size];
     RandomAccessFile ranomAFile = new RandomAccessFile(file, "r");
@@ -25,16 +23,13 @@ public class FileStorage {
     return readData;
   }
 
-  public static void updateFile(String indexName, byte[] data, int offset) throws IOException {
-    System.out.println("write to storage");
-    System.out.println(indexName + " : " + offset);
-    String filePath = FileStorage.INDEX_DIR + "/" + indexName;
-    if (!Files.exists(Paths.get(filePath))) {
+  public static void updateFile(String fileName, byte[] data, int offset) throws IOException {
+    if (!Files.exists(Paths.get(INDEX_DIR + "/" + fileName))) {
       // initializeBTree(indexName);
-      Files.createFile(Paths.get(filePath));
+      Files.createFile(Paths.get(INDEX_DIR + "/" + fileName));
     }
 
-    File file = new File(filePath);
+    File file = new File(INDEX_DIR + "/" + fileName);
     RandomAccessFile ranomAFile = new RandomAccessFile(file, "rw");
     ranomAFile.seek(offset);
     ranomAFile.write(data);

@@ -10,6 +10,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import page.LeafPage;
+import page.NoneLeafPage;
 
 class BTreeTest {
 
@@ -55,28 +57,49 @@ class BTreeTest {
       System.out.println("testing kv : " + key + ", " + value);
       tree.insert(key, value);
       assertEquals(value, tree.read(key));
-      System.out.println("asert ok");
     }
 
   }
 
   @Test
-  void testInsertAndReadWithIO() {
-    // ストレージからのページの読み取り、更新、保存の保存の部分がうまくいかない
-    // readする時にストレージから読みとれれているので消されてはいるはず
-    // 参照の問題かな。オブジェクト更新しているけど、参照が別みたいな
-    // 普通キャッシュは何か重い演算の結果だから、編集なんてしないよね・・・どうなんやろ
+  void testInsertingBiggerValue() {
     tree.insert(5, 20);
+    tree.insert(6, 23342);
+    tree.insert(87, 123);
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
     assertEquals(20, tree.read(5));
+    assertEquals(23342, tree.read(6));
+    assertEquals(123, tree.read(87));
+  }
+
+  @Test
+  void testInsertingSmallerValue() {
+    tree.insert(87, 20);
+    tree.insert(20, 23342);
+    tree.insert(5, 20);
     System.out.println("wait 5 sec");
     try {
       Thread.sleep(5000);
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
-    tree = null;
-    tree = BTree.getBTree(TREE_NAME);
-    // assertEquals(20, tree.read(5));
+    assertEquals(20, tree.read(87));
+    assertEquals(23342, tree.read(20));
+    assertEquals(20, tree.read(5));
+  }
+
+  @Test
+  void testInsert() {
+    tree.insert(5, 20);
+    NoneLeafPage rootPage = (NoneLeafPage) this.tree.pageCache.getPage(0, false);
+    LeafPage leafPage = (LeafPage) this.tree.pageCache.getPage(19, true);
+    assertEquals(19, rootPage.getChildPageId(5));
+    assertEquals(20, leafPage.getValue(5));
+    assertEquals(20, tree.read(5));
   }
 
 

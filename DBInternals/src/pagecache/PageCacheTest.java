@@ -64,8 +64,8 @@ class PageCacheTest {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
-    page = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID, isLeaf);
-    assertEquals(10, page.getChildPageId(3));
+    NoneLeafPage anotherPage = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID, isLeaf);
+    assertEquals(10, anotherPage.getChildPageId(3));
 
   }
 

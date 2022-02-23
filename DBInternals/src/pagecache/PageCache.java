@@ -3,6 +3,8 @@ package pagecache;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -39,6 +41,7 @@ public class PageCache {
   // transactionのために明示的にpageを保存する場合は、メモリ上のpageは修正済みで、ストレージとのsyncは普通に保存を実行すればいいか？ i think so.
   // 実際保存するタイミングすらまだ教科書的に理解できていません・・・・
   // その機能はpagechacheで行う
+  private static Logger logger = LogManager.getLogger();
   public LoadingCache<PageCacheKey<String, Integer, Boolean>, Page> cache = null;
 
   public PageCache(String treeName) {
@@ -50,13 +53,15 @@ public class PageCache {
           public Page load(PageCacheKey<String, Integer, Boolean> key) throws Exception {
             // pageIdに合致するページをストレージから取得する
             // cacheをtree毎に作成するかどうか。index間で共有するならkeyをpageID以外にしないといけない
-            System.out.println("read data from storage pageID : " + key.key2);
             byte[] pageBinary = BTree.getPageBinary(key.key1, key.key2);
+            Page cachingPage = null;
             if (key.key3) {
-              return new LeafPage(pageBinary);
+              cachingPage = new LeafPage(pageBinary);
             } else {
-              return new NoneLeafPage(pageBinary);
+              cachingPage = new NoneLeafPage(pageBinary);
             }
+            logger.debug("cached page from storage with pageID : " + key.key2);
+            return cachingPage;
           }
         };
 
@@ -69,10 +74,10 @@ public class PageCache {
         int pageID = notification.getKey().key2;
         try {
           FileStorage.updateFile(indexName, pageBinary, BTree.getPageIdOffset(pageID));
-          System.out.println("write data to storage. pageID : " + pageID);
         } catch (IOException e) {
           e.printStackTrace();
         }
+        logger.debug("removed page from cache with pageID : " + pageID);
       }
     };
 

@@ -6,11 +6,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import index.BTree;
 import others.BinaryUtil;
 
 public class NoneLeafPage extends Page {
 
+  private Logger logger = LogManager.getLogger();
   // pageの解放ってどうする？
   // こういう風にpageの全ての値を読み込んでいるみたいだけども、修正するときは本当に必要なblockだけCoRでされるっていう認識であっているのかなあ
   private static final int PAGE_SIZE = 4000;
@@ -39,12 +42,10 @@ public class NoneLeafPage extends Page {
 
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
-    System.out.println("offset count : " + this.header.offsetCount);
     this.offsets = new ArrayList<Integer>();
     for (int i = 0; i < this.header.offsetCount; i++) {
       int t = this.header.tmp_header_offset;
       byte[] offset = Arrays.copyOfRange(pageBinary, t, t + NoneLeafPage.OFFSET_SIZE);
-      System.out.println("omega : " + BinaryUtil.bytesToInt(offset));
       this.offsets.add(BinaryUtil.bytesToInt(offset));
       t += NoneLeafPage.OFFSET_SIZE;
     }
@@ -52,7 +53,6 @@ public class NoneLeafPage extends Page {
     // parse cells
     this.KeyValueCellMap = new TreeMap<Integer, KeyValueCell>();
     for (int offset : this.offsets) {
-      System.out.println("looping offsets : " + offset);
       KeyValueCell cell = new KeyValueCell(pageBinary, offset);
       this.KeyValueCellMap.put(cell.getKey(), cell);
     }
@@ -79,15 +79,11 @@ public class NoneLeafPage extends Page {
   // TODO:might be more efficient to modify binary data on memoery each time its component value is
   // modified
   public byte[] getBinary() {
-    System.out.println("NoneLeafPage getBianry");
     byte[] binary = new byte[NoneLeafPage.PAGE_SIZE];
 
     // add header
     byte[] headerBinary = this.header.getBinary();
-    System.out.println("size : " + headerBinary.length);
-    System.out.println("kokomadeikuyo : " + this.header.tmp_header_offset);
     for (int i = 0; i < this.header.tmp_header_offset; i++) {
-      System.out.println(i);
       binary[i] = headerBinary[i];
     }
 
@@ -115,8 +111,6 @@ public class NoneLeafPage extends Page {
       }
       i_cell -= cellBinary.length;
 
-      System.out.println("kv added to page ID : " + this.pageId);
-
       // get next key
       key = this.KeyValueCellMap.higherKey(key);
       if (key == null) {
@@ -131,16 +125,15 @@ public class NoneLeafPage extends Page {
   public int getChildPageId(int key) {
     // always connect to new pageID when searching down.
     if (this.header.offsetCount == 0) {
-      System.out.println("naidesu");
+      logger.debug("No Child Node");
       return -1;
     }
 
     // TODO:ここで新しいkeyが入る場所を探そうとするとnpになる
     // でもこうしてしまうと私い
-    Integer lowerKey = this.KeyValueCellMap.floorKey(key);
+    Integer lowerKey = this.KeyValueCellMap.ceilingKey(key);
     if (lowerKey == null) {
-      System.out.println("kokokana");
-      return -1;
+      return this.header.getRightMostPageID();
     } else {
       return this.KeyValueCellMap.get(lowerKey).getValue();
     }
@@ -156,6 +149,7 @@ public class NoneLeafPage extends Page {
   }
 
   public int[] insert(int key, int pageID) {
+    logger.debug("inserted kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
 
     KeyValueCell cell = new KeyValueCell(key, pageID);
 
@@ -166,15 +160,13 @@ public class NoneLeafPage extends Page {
     if (hasEnoughSpace) {
       this.header.cell_start_offset -= cell.getBinary().length;
       this.offsets.add(this.header.cell_start_offset);
-      System.out.println("offset count : " + this.header.offsetCount);
       this.header.offsetCount += 1;
       Collections.sort(this.offsets);
       this.KeyValueCellMap.put(key, cell);
-      System.out.println("NoneLeafPage insert");
-      System.out.println(key);
-      System.out.println(pageID);
-      System.out.println("offset count : " + this.header.offsetCount);
-      System.out.println("######");
+      if (this.header.getRightMostPageID() == 0) {
+        this.header.setRightMostPageID(BTree.assignPageId());
+      }
+      // TODO : do i have to sava pageid to storage?
       return new int[] {0};
     } else {
       int propatationKey = this.splitPage(key, pageID);

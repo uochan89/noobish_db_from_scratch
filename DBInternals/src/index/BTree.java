@@ -5,6 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Stack;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import page.LeafPage;
 import page.NoneLeafPage;
 import pagecache.PageCache;
@@ -14,9 +16,11 @@ public class BTree {
   public static void main(String[] args) {
     BTree tree = BTree.getBTree("new_omega");
     tree.insert(11, 7);
+    tree.insert(14, 9);
     System.out.println("sucess");
   }
 
+  private static Logger logger = LogManager.getLogger();
   private static final int ROOT_PAGE_ID = 0;
   private static final int HEADER_SIZE = 200;
   private static final int PAGE_SIZE = 4000;
@@ -71,6 +75,7 @@ public class BTree {
 
   public void insert(int key, int value) {
     // TODO:header, tailのためのオブジェクト生成。実際のファイルアクセスはpageの層でやるので、thがないままだと不要
+    logger.info("insert (key, value) = " + "(" + key + ", " + value + ")");
     Stack<Integer> breadCrumbs = new Stack<Integer>();
     this.getLeafPageIDWithBreadCrumbs(key, breadCrumbs);
 
@@ -80,16 +85,14 @@ public class BTree {
       // TODO: assign kv to leaf page herez
       LeafPage leafPage = new LeafPage();
       leafPage.insert(key, value);
-      value = leafPage.pageId;
+      leafPageID = leafPage.pageId;
       this.pageCache.assignNewPage(leafPage);
 
       // propagate the pageID of new leaf page to parents
       int parentPageID = breadCrumbs.pop();
-      System.out.println("parent : " + parentPageID);
       NoneLeafPage targetPage = (NoneLeafPage) this.pageCache.getPage(parentPageID, false);
       // result {isSucceed, propagateKey}
-      System.out.println("korewoireru : " + value);
-      int[] result = targetPage.insert(key, value);
+      int[] result = targetPage.insert(key, leafPageID);
 
       while (result[0] != 0) {
         key = result[1];
@@ -119,13 +122,17 @@ public class BTree {
         result = parentPage.insert(key, childPageID);
       }
     }
+    logger.info("finished insert (key, value) = " + "(" + key + ", " + value + ")");
   }
 
   public int read(int key) {
+    logger.info("start read (key) = " + "(" + key + ")");
     int leafPageID = this.getLeafPage(key);
     System.out.println("leafPageID : " + leafPageID);
     LeafPage page = (LeafPage) this.pageCache.getPage(leafPageID, true);
-    return page.getValue(key);
+    int value = page.getValue(key);
+    logger.info("finish read (key, value) = " + "(" + key + ", " + value + ")");
+    return value;
   }
 
   // TODO: refine erro handling
@@ -143,7 +150,9 @@ public class BTree {
   public static int assignPageId() {
     // やはり、tree headerに使用済みのページを管理する必要がある？
     // 一旦メモリ上で実現しておく
-    return avaliablePageIds.pop();
+    int pageID = avaliablePageIds.pop();
+    logger.debug("new pageID is assigned : " + pageID);
+    return pageID;
   }
 
   private int getLeafPage(int key) {

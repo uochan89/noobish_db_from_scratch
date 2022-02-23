@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import index.BTree;
 import others.BinaryUtil;
 
@@ -15,6 +17,7 @@ public class LeafPage extends Page {
    * structure header, offsets, pages, tail
    */
 
+  private static Logger logger = LogManager.getLogger();
   private static final int PAGE_SIZE = 4000;
   private static final int OFFSET_SIZE = 4;
 
@@ -32,6 +35,7 @@ public class LeafPage extends Page {
     super.pageId = BTree.assignPageId();
     this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
     this.offsets = new ArrayList<Integer>();
+    logger.debug("created a new LeafPage with pageID : " + super.pageId);
   }
 
   // constructor for splitting
@@ -47,13 +51,12 @@ public class LeafPage extends Page {
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
     this.offsets = new ArrayList<Integer>();
+    int t = this.header.tmp_header_offset;
     for (int i = 0; i < this.header.offsetCount; i++) {
-      int t = this.header.tmp_header_offset;
       byte[] offset = Arrays.copyOfRange(pageBinary, t, t + LeafPage.OFFSET_SIZE);
       this.offsets.add(BinaryUtil.bytesToInt(offset));
       t += LeafPage.OFFSET_SIZE;
     }
-    System.out.println(this.offsets);
 
     // parse cells
     this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
@@ -87,6 +90,8 @@ public class LeafPage extends Page {
   // It needs to be confirmed that this page is leaf node beforehand.
   // connect pointer of this object to parent none leaf node.
   public int[] insert(int key, int value) {
+    logger.debug(
+        "insert (key, value) = " + "(" + key + ", " + value + ") to pageID : " + super.pageId);
     KeyValueCell cell = new KeyValueCell(key, value);
 
     // check if new kv is insertable without splitting the page.
@@ -158,7 +163,6 @@ public class LeafPage extends Page {
     int i_offset = this.header.tmp_header_offset;
     List<Integer> sortedOffsets = this.getSortedOffset();
     for (int offset : sortedOffsets) {
-      System.out.println(offset);
       byte[] b = BinaryUtil.intToBytes(offset);
       for (int i = 0; i < b.length; i++) {
         binary[i_offset + i] = b[i];

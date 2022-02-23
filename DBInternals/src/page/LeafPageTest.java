@@ -55,4 +55,13 @@ class LeafPageTest {
 
   }
 
+  @Test
+  void testInsertValues() {
+    LeafPage page = new LeafPage();
+    page.insert(3, 5);
+    page.insert(10, 20);
+    assertEquals(5, page.getValue(3));
+    assertEquals(20, page.getValue(10));
+  }
+
 }
