@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import others.BinaryUtil;
 
-public class KeyValueCell extends Cell {
+public class KeyValueCell {
 
   private int key;
   private int value;
@@ -58,26 +58,9 @@ public class KeyValueCell extends Cell {
     return this.value;
   }
 
-  public int getKey() {
+  public Integer getKey() {
     return this.key;
   }
 
-  private void idk() {
-    byte[] cellBinary = new byte[KeyValueCell.KEY_SIZE_LENGTH + KeyValueCell.VALUE_SIZE_LENGTH + 2];
 
-    int i = 0;
-    for (byte b : padded_key_size) {
-      cellBinary[i] = b;
-      i++;
-    }
-    for (byte b : padded_value_size) {
-      cellBinary[i] = b;
-      i++;
-    }
-    cellBinary[i] = (byte) key;
-    i++;
-    cellBinary[i] = (byte) value;
-    i++;
-
-  }
 }

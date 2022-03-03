@@ -45,18 +45,15 @@ class PageCacheTest {
   void testGetPage() {
     int pageID = 0;
     String indexName = "page_cache_test";
-    boolean isLeaf = false;
-    this.btree.pageCache.getPage(pageID, isLeaf);
-    PageCacheKey<String, Integer, Boolean> key =
-        new PageCacheKey<String, Integer, Boolean>(indexName, pageID, isLeaf);
+    this.btree.pageCache.getPage(pageID);
+    PageCacheKey<String, Integer> key = new PageCacheKey<String, Integer>(indexName, pageID);
     assertNotNull(PageCacheTest.btree.pageCache.cache.getIfPresent(key));
   }
 
   @Test
   void testPageUpdate() {
-    int pageID = 0;;
-    boolean isLeaf = false;
-    NoneLeafPage page = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID, isLeaf);
+    int pageID = 0;
+    NoneLeafPage page = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID);
     page.insert(3, 10);
     page = null;
     try {
@@ -64,7 +61,7 @@ class PageCacheTest {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
-    NoneLeafPage anotherPage = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID, isLeaf);
+    NoneLeafPage anotherPage = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID);
     assertEquals(10, anotherPage.getChildPageId(3));
 
   }

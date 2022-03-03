@@ -19,6 +19,7 @@ import page.Page;
 public class PageCache {
 
   private static int PAGE_SIZE = 4000;
+  private BTree btree;
   private String treeName;
 
   /*
@@ -42,33 +43,33 @@ public class PageCache {
   // 実際保存するタイミングすらまだ教科書的に理解できていません・・・・
   // その機能はpagechacheで行う
   private static Logger logger = LogManager.getLogger();
-  public LoadingCache<PageCacheKey<String, Integer, Boolean>, Page> cache = null;
+  public LoadingCache<PageCacheKey<String, Integer>, Page> cache = null;
 
-  public PageCache(String treeName) {
-    this.treeName = treeName;
+  public PageCache(BTree btree) {
+    this.btree = btree;
+    this.treeName = this.btree.indexName;
 
-    CacheLoader<PageCacheKey<String, Integer, Boolean>, Page> loader =
-        new CacheLoader<PageCacheKey<String, Integer, Boolean>, Page>() {
+    CacheLoader<PageCacheKey<String, Integer>, Page> loader =
+        new CacheLoader<PageCacheKey<String, Integer>, Page>() {
           @Override
-          public Page load(PageCacheKey<String, Integer, Boolean> key) throws Exception {
+          public Page load(PageCacheKey<String, Integer> key) throws Exception {
             // pageIdに合致するページをストレージから取得する
             // cacheをtree毎に作成するかどうか。index間で共有するならkeyをpageID以外にしないといけない
             byte[] pageBinary = BTree.getPageBinary(key.key1, key.key2);
             Page cachingPage = null;
-            if (key.key3) {
-              cachingPage = new LeafPage(pageBinary);
+            if (Page.isLeafPage(key.key2, pageBinary)) {
+              cachingPage = new LeafPage(pageBinary, btree);
             } else {
-              cachingPage = new NoneLeafPage(pageBinary);
+              cachingPage = new NoneLeafPage(pageBinary, btree);
             }
             logger.debug("cached page from storage with pageID : " + key.key2);
             return cachingPage;
           }
         };
 
-    RemovalListener listener = new RemovalListener<PageCacheKey<String, Integer, Boolean>, Page>() {
+    RemovalListener listener = new RemovalListener<PageCacheKey<String, Integer>, Page>() {
       @Override
-      public void onRemoval(
-          RemovalNotification<PageCacheKey<String, Integer, Boolean>, Page> notification) {
+      public void onRemoval(RemovalNotification<PageCacheKey<String, Integer>, Page> notification) {
         String indexName = notification.getKey().key1;
         byte[] pageBinary = notification.getValue().getBinary();
         int pageID = notification.getKey().key2;
@@ -81,19 +82,19 @@ public class PageCache {
       }
     };
 
-    cache = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.SECONDS)
+    cache = CacheBuilder.newBuilder().expireAfterAccess(100, TimeUnit.SECONDS)
         .removalListener(listener).build(loader);
   }
 
   public void assignNewPage(Page page) {
-    PageCacheKey<String, Integer, Boolean> key = new PageCacheKey<String, Integer, Boolean>(
-        this.treeName, page.pageId, page instanceof LeafPage);
+    PageCacheKey<String, Integer> key =
+        new PageCacheKey<String, Integer>(this.treeName, page.pageId);
     this.cache.put(key, page);
   }
 
-  public void savePageToStorage(int pageID, boolean isLeaf) {
+  public void savePageToStorage(int pageID) {
     Page page = null;
-    page = this.getPage(pageID, isLeaf);
+    page = this.getPage(pageID);
     int pageOffset = BTree.getPageIdOffset(pageID);
     try {
       FileStorage.updateFile(this.treeName, page.getBinary(), pageOffset);
@@ -103,9 +104,8 @@ public class PageCache {
   }
 
 
-  public Page getPage(int pageID, boolean isLeaf) {
-    PageCacheKey<String, Integer, Boolean> key =
-        new PageCacheKey<String, Integer, Boolean>(this.treeName, pageID, isLeaf);
+  public Page getPage(int pageID) {
+    PageCacheKey<String, Integer> key = new PageCacheKey<String, Integer>(this.treeName, pageID);
     try {
       return this.cache.get(key);
     } catch (ExecutionException e) {

@@ -7,9 +7,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import index.BTree;
-import others.BinaryUtil;
+import index.FileStorage;
 
 class LeafPageTest {
+
+  BTree tree;
+  private static final String TREE_NAME = "test_leafpage";
 
   @BeforeAll
   static void setUpBeforeClass() throws Exception {}
@@ -18,16 +21,19 @@ class LeafPageTest {
   static void tearDownAfterClass() throws Exception {}
 
   @BeforeEach
-  void setUp() throws Exception {}
+  void setUp() throws Exception {
+    tree = BTree.getBTree(TREE_NAME);
+  }
 
   @AfterEach
-  void tearDown() throws Exception {}
+  void tearDown() throws Exception {
+    FileStorage.deleteBTree(TREE_NAME);
+  }
 
   @Test
   void testBinaryIO() {
-    BTree tree = BTree.getBTree("test_leafpage");
 
-    LeafPage page = new LeafPage();
+    LeafPage page = new LeafPage(tree);
     page.insert(3, 5);
     tree.pageCache.assignNewPage(page);
 
@@ -39,25 +45,16 @@ class LeafPageTest {
       e1.printStackTrace();
     }
 
-    System.out.println(page.pageId);
     LeafPage pageFromStorage = null;
-    pageFromStorage = (LeafPage) tree.pageCache.getPage(page.pageId, true);
+    pageFromStorage = (LeafPage) tree.pageCache.getPage(page.pageId);
 
     int value = pageFromStorage.getValue(3);
     assertEquals(5, value);
   }
 
   @Test
-  void insertWhithoutSplit() {
-    LeafPage page = new LeafPage();
-    page.insert(3, 5);
-    BinaryUtil.consoleOutByByte(page.getBinary());
-
-  }
-
-  @Test
   void testInsertValues() {
-    LeafPage page = new LeafPage();
+    LeafPage page = new LeafPage(tree);
     page.insert(3, 5);
     page.insert(10, 20);
     assertEquals(5, page.getValue(3));

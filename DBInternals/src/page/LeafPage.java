@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.TreeMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,22 +19,21 @@ public class LeafPage extends Page {
    */
 
   private static Logger logger = LogManager.getLogger();
-  private static final int PAGE_SIZE = 4000;
   private static final int OFFSET_SIZE = 4;
 
   private BTree btree;
   private Map<Integer, KeyValueCell> kvMap = new TreeMap<Integer, KeyValueCell>();
   private byte[] pageBinary;
   private PageHeader header;
-  private TreeMap<Integer, KeyValueCell> keyValueCellMap;
+  private KeyValueCellMap keyValueCellMap;
   private List<Integer> offsets;
-  // freeになったセルとその大きさを記録する
-  private int[][] availabilityList;
 
-  public LeafPage() {
+  public LeafPage(BTree btree) {
+    this.btree = btree;
     this.header = new PageHeader();
-    super.pageId = BTree.assignPageId();
-    this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
+    this.header.isLeafPage = true;
+    super.pageId = this.btree.assignPageId(this);
+    this.keyValueCellMap = new KeyValueCellMap(Page.PAGE_SIZE - this.header.tmp_header_offset);
     this.offsets = new ArrayList<Integer>();
     logger.debug("created a new LeafPage with pageID : " + super.pageId);
   }
@@ -44,10 +44,10 @@ public class LeafPage extends Page {
     // TODO: initialize other stuff
   }
 
-  public LeafPage(byte[] pageBinary) {
+  public LeafPage(byte[] pageBinary, BTree btree) {
     // parse header
     this.header = new PageHeader(pageBinary);
-
+    this.btree = btree;
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
     this.offsets = new ArrayList<Integer>();
@@ -59,10 +59,10 @@ public class LeafPage extends Page {
     }
 
     // parse cells
-    this.keyValueCellMap = new TreeMap<Integer, KeyValueCell>();
+    this.keyValueCellMap = new KeyValueCellMap(Page.PAGE_SIZE - this.header.tmp_header_offset);
     for (int offset : this.offsets) {
       KeyValueCell cell = new KeyValueCell(pageBinary, offset);
-      this.keyValueCellMap.put(cell.getKey(), cell);
+      this.keyValueCellMap.add(cell);
     }
   }
 
@@ -87,41 +87,45 @@ public class LeafPage extends Page {
 
   }
 
+
   // It needs to be confirmed that this page is leaf node beforehand.
   // connect pointer of this object to parent none leaf node.
   public int[] insert(int key, int value) {
-    logger.debug(
-        "insert (key, value) = " + "(" + key + ", " + value + ") to pageID : " + super.pageId);
+    logger.debug("insert (key, value) = " + "(" + key + ", " + value + ") to LeafPage(pageID : "
+        + super.pageId + ")");
     KeyValueCell cell = new KeyValueCell(key, value);
 
-    // check if new kv is insertable without splitting the page.
-    boolean hasEnoughSpace = true;
-
     // update offset and celllist
-    if (hasEnoughSpace) {
+    if (this.keyValueCellMap.hasEnoughSpace(key, value)) {
       this.header.cell_start_offset -= cell.getBinary().length;
       this.offsets.add(this.header.cell_start_offset);
       this.header.offsetCount += 1;
       Collections.sort(this.offsets);
-      this.keyValueCellMap.put(key, cell);
+      this.keyValueCellMap.add(cell);
+      logger.debug(
+          "inserted (key, value) = " + "(" + key + ", " + value + ") to pageID : " + super.pageId);
       return new int[] {0};
     } else {
-      int propatationKey = this.splitPage(key, value);
-      return new int[] {-1, propatationKey};
+      logger.debug("no more space in page start splitting");
+      int[] propagationInf = this.splitPage(key, value);
+      logger.debug("splited page new partition key : " + propagationInf[0] + " new pageID :"
+          + propagationInf[1]);
+      return new int[] {-1, propagationInf[0], propagationInf[1]};
     }
   }
 
-  private int splitPage(int key, int value) {
-    Map<Integer, KeyValueCell> newKvMap = new TreeMap<Integer, KeyValueCell>();
-    List<Integer> keySet = new ArrayList<Integer>(this.kvMap.keySet());
-    for (int i = 0; i < keySet.size() / 2; i++) {
-      int j = i + keySet.size() / 2;
-      newKvMap.put(keySet.get(j), this.kvMap.get(keySet.get(j)));
+  private int[] splitPage(int key, int value) {
+    LeafPage newPage = new LeafPage(this.btree);
+    this.btree.pageCache.assignNewPage(newPage);
+    newPage.insert(key, value);
+
+    NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
+    int propagatingKey = naviMap.last();
+    for (int i = 0; i < naviMap.size() / 2; i++) {
+      newPage.insert(propagatingKey, this.keyValueCellMap.get(propagatingKey).getValue());
+      propagatingKey = naviMap.lower(propagatingKey);
     }
-
-    LeafPage newPage = new LeafPage(newKvMap);
-
-    return keySet.get(keySet.size() / 2);
+    return new int[] {naviMap.higher(propagatingKey), newPage.pageId};
   }
 
   // TODO:insertした時にoffsetのソートが保てていないので２分探索ができていない
@@ -136,7 +140,7 @@ public class LeafPage extends Page {
     //
     int offset_value = LeafPage.PAGE_SIZE - 1;
     while (true) {
-      KeyValueCell cell = this.keyValueCellMap.get(key);
+      KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
       offset_value -= cell.getBinary().length;
       sortedOffsets.add(offset_value);
       // get next key
@@ -178,7 +182,7 @@ public class LeafPage extends Page {
     int i_cell = this.header.free_space_right_index - 1;
     Integer key = this.keyValueCellMap.firstKey();
     while (true) {
-      KeyValueCell cell = this.keyValueCellMap.get(key);
+      KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
       byte[] cellBinary = cell.getBinary();
       int t = i_cell - cellBinary.length + 1;
       for (byte b : cellBinary) {
@@ -195,6 +199,11 @@ public class LeafPage extends Page {
     }
 
     return binary;
+  }
+
+  @Override
+  public int getChildPageId(int key) {
+    return -1;
   }
 
 

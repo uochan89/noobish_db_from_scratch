@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.NavigableSet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import index.BTree;
@@ -20,26 +19,29 @@ public class NoneLeafPage extends Page {
   private static final int OFFSET_SIZE = 4;
   private static final int HEADER_SIZE = 10;
   private PageHeader header;
-  public int pageId;
   // offset, KeyValueCell
-  private TreeMap<Integer, KeyValueCell> KeyValueCellMap;
+  private KeyValueCellMap keyValueCellMap;
   private List<Integer> offsets;
+  private BTree btree;
 
   // TODO:freeになったセルとその大きさを記録する
   private int[][] availabilityList;
   // private Map<Integer, KeyValueCell> kvMap = new TreeMap<Integer, KeyValueCell>();
 
-  public NoneLeafPage() {
+  public NoneLeafPage(BTree btree) {
+    this.btree = btree;
     this.header = new PageHeader();
-    this.pageId = BTree.assignPageId();
-    this.KeyValueCellMap = new TreeMap<Integer, KeyValueCell>();
+    this.header.isLeafPage = false;
+    this.pageId = this.btree.assignPageId(this);
+    this.keyValueCellMap =
+        new KeyValueCellMap(NoneLeafPage.PAGE_SIZE - this.header.tmp_header_offset);
     this.offsets = new ArrayList<Integer>();
   }
 
-  public NoneLeafPage(byte[] pageBinary) {
+  public NoneLeafPage(byte[] pageBinary, BTree btree) {
     // parse header
     this.header = new PageHeader(pageBinary);
-
+    this.btree = btree;
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
     this.offsets = new ArrayList<Integer>();
@@ -51,24 +53,26 @@ public class NoneLeafPage extends Page {
     }
 
     // parse cells
-    this.KeyValueCellMap = new TreeMap<Integer, KeyValueCell>();
+    this.keyValueCellMap =
+        new KeyValueCellMap(NoneLeafPage.PAGE_SIZE - this.header.tmp_header_offset);
     for (int offset : this.offsets) {
       KeyValueCell cell = new KeyValueCell(pageBinary, offset);
-      this.KeyValueCellMap.put(cell.getKey(), cell);
+      // TODO: how should i implement for not other programmers to use extended apis
+      this.keyValueCellMap.add(cell);
     }
   }
 
   private List<Integer> getSortedOffset() {
     List<Integer> sortedOffsets = new ArrayList<Integer>();
-    Integer key = this.KeyValueCellMap.firstKey();
+    Integer key = this.keyValueCellMap.firstKey();
     //
     int offset_value = NoneLeafPage.PAGE_SIZE - 1;
     while (true) {
-      KeyValueCell cell = this.KeyValueCellMap.get(key);
+      KeyValueCell cell = this.keyValueCellMap.get(key);
       offset_value -= cell.getBinary().length;
       sortedOffsets.add(offset_value);
       // get next key
-      key = this.KeyValueCellMap.higherKey(key);
+      key = this.keyValueCellMap.higherKey(key);
       if (key == null) {
         break;
       }
@@ -100,9 +104,9 @@ public class NoneLeafPage extends Page {
 
     // add keyValue
     int i_cell = this.header.free_space_right_index - 1;
-    Integer key = this.KeyValueCellMap.firstKey();
+    Integer key = this.keyValueCellMap.firstKey();
     while (true) {
-      KeyValueCell cell = this.KeyValueCellMap.get(key);
+      KeyValueCell cell = this.keyValueCellMap.get(key);
       byte[] cellBinary = cell.getBinary();
       int t = i_cell - cellBinary.length + 1;
       for (byte b : cellBinary) {
@@ -112,7 +116,7 @@ public class NoneLeafPage extends Page {
       i_cell -= cellBinary.length;
 
       // get next key
-      key = this.KeyValueCellMap.higherKey(key);
+      key = this.keyValueCellMap.higherKey(key);
       if (key == null) {
         break;
       }
@@ -125,17 +129,17 @@ public class NoneLeafPage extends Page {
   public int getChildPageId(int key) {
     // always connect to new pageID when searching down.
     if (this.header.offsetCount == 0) {
-      logger.debug("No Child Node");
+      logger.debug("No Child Node pageID : " + super.pageId);
       return -1;
     }
 
     // TODO:ここで新しいkeyが入る場所を探そうとするとnpになる
     // でもこうしてしまうと私い
-    Integer lowerKey = this.KeyValueCellMap.ceilingKey(key);
+    Integer lowerKey = this.keyValueCellMap.ceilingKey(key);
     if (lowerKey == null) {
       return this.header.getRightMostPageID();
     } else {
-      return this.KeyValueCellMap.get(lowerKey).getValue();
+      return this.keyValueCellMap.get(lowerKey).getValue();
     }
   }
 
@@ -143,13 +147,13 @@ public class NoneLeafPage extends Page {
     LeafPage leafPage = new LeafPage();
     int pageId = leafPage.pageId;
     KeyValueCell cell = new KeyValueCell(key, pageId);
-    this.KeyValueCellMap.put(key, cell);
+    this.keyValueCellMap.put(key, cell);
     this.offsets.add(this.header.free_space_right_index - cell.getBinary().length);
     return pageId;
   }
 
   public int[] insert(int key, int pageID) {
-    logger.debug("inserted kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
+    logger.debug("insert kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
 
     KeyValueCell cell = new KeyValueCell(key, pageID);
 
@@ -162,29 +166,35 @@ public class NoneLeafPage extends Page {
       this.offsets.add(this.header.cell_start_offset);
       this.header.offsetCount += 1;
       Collections.sort(this.offsets);
-      this.KeyValueCellMap.put(key, cell);
+      this.keyValueCellMap.add(cell);
       if (this.header.getRightMostPageID() == 0) {
-        this.header.setRightMostPageID(BTree.assignPageId());
+        // これあってる？
+        this.header.setRightMostPageID(this.btree.assignPageId(this));
       }
       // TODO : do i have to sava pageid to storage?
+      logger.debug(
+          "insert completed for kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
       return new int[] {0};
     } else {
-      int propatationKey = this.splitPage(key, pageID);
-      return new int[] {-1, propatationKey};
+      int[] propatationInf = this.splitPage(key, pageID);
+      return new int[] {-1, propatationInf[0], propatationInf[1]};
     }
   }
 
-  private int splitPage(int key, int value) {
-    Map<Integer, KeyValueCell> newKvMap = new TreeMap<Integer, KeyValueCell>();
-    List<Integer> keySet = new ArrayList<Integer>(this.KeyValueCellMap.keySet());
-    for (int i = 0; i < keySet.size() / 2; i++) {
-      int j = i + keySet.size() / 2;
-      newKvMap.put(keySet.get(j), this.KeyValueCellMap.get(keySet.get(j)));
+  private int[] splitPage(int key, int value) {
+    NoneLeafPage newPage = new NoneLeafPage();
+
+    NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
+    int propagatingKey = naviMap.first();
+    int mapKey = propagatingKey;
+    for (int i = 0; i < naviMap.size() / 2; i++) {
+      newPage.insert(mapKey, this.keyValueCellMap.get(mapKey).getValue());
+      mapKey = naviMap.higher(mapKey);
     }
 
-    NoneLeafPage newPage = new NoneLeafPage(newKvMap);
+    return new int[] {propagatingKey, newPage.pageId};
 
-    return keySet.get(keySet.size() / 2);
   }
+
 
 }

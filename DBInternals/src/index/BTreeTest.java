@@ -10,8 +10,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import page.LeafPage;
-import page.NoneLeafPage;
 
 class BTreeTest {
 
@@ -93,14 +91,27 @@ class BTreeTest {
   }
 
   @Test
-  void testInsert() {
-    tree.insert(5, 20);
-    NoneLeafPage rootPage = (NoneLeafPage) this.tree.pageCache.getPage(0, false);
-    LeafPage leafPage = (LeafPage) this.tree.pageCache.getPage(19, true);
-    assertEquals(19, rootPage.getChildPageId(5));
-    assertEquals(20, leafPage.getValue(5));
-    assertEquals(20, tree.read(5));
+  void testInsertAndReadWithMerge() {
+    for (int key = 0; key < 2000; key++) {
+      int value = key;
+      tree.insert(key, value);
+    }
+    System.out.println("inserted 2000 data");
+    for (int key = 0; key < 2000; key++) {
+      assertEquals(key, tree.read(key));
+    }
   }
 
+  @Test
+  void testInsertAndReadWithSplit() {
+    for (int key = 1999; key >= 0; key--) {
+      int value = key;
+      tree.insert(key, value);
+    }
+    System.out.println("inserted 2000 data");
+    for (int key = 0; key < 2000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
 
 }

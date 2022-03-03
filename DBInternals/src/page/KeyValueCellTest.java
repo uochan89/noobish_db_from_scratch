@@ -39,8 +39,8 @@ class KeyValueCellTest {
     i += BinaryUtil.bytesToInt(key_size);
     byte[] value = Arrays.copyOfRange(binary, i, i + BinaryUtil.bytesToInt(value_size));
 
-    assertEquals(cell.getKey(), BinaryUtil.bytesToInt(key));
     assertEquals(cell.getValue(), BinaryUtil.bytesToInt(value));
+    assertEquals(cell.getKey(), BinaryUtil.bytesToInt(key));
   }
 
 }

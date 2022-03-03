@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import page.LeafPage;
 import page.NoneLeafPage;
+import page.Page;
 import pagecache.PageCache;
 
 public class BTree {
@@ -27,20 +28,21 @@ public class BTree {
 
   public PageCache pageCache;
   private BTreeHeader header = new BTreeHeader();
-  private String indexName;
+  private BTreeTailer tailer = new BTreeTailer();
+  public String indexName;
 
 
   public static int getPageIdOffset(int pageID) {
     return BTree.HEADER_SIZE + BTree.PAGE_SIZE * pageID;
   }
-
-  private static Stack<Integer> avaliablePageIds = new Stack<Integer>();
-
-  static {
-    for (int i = 1; i < 20; i++) {
-      BTree.avaliablePageIds.add(i);
-    }
-  }
+  //
+  // private static Stack<Integer> avaliablePageIds = new Stack<Integer>();
+  //
+  // static {
+  // for (int i = 1; i < 200; i++) {
+  // BTree.avaliablePageIds.add(i);
+  // }
+  // }
 
   // used to retrieve btree data from storage
   private BTree(String indexName, byte[] headerBianry, byte[] tailBinary) {
@@ -51,7 +53,7 @@ public class BTree {
   private BTree(String indexName) {
     // initialize members
     this.indexName = indexName;
-    this.pageCache = new PageCache(indexName);
+    this.pageCache = new PageCache(this);
   };
 
   //
@@ -79,19 +81,18 @@ public class BTree {
     Stack<Integer> breadCrumbs = new Stack<Integer>();
     this.getLeafPageIDWithBreadCrumbs(key, breadCrumbs);
 
-
     int leafPageID = breadCrumbs.pop();
     if (leafPageID == -1) {
       // TODO: assign kv to leaf page herez
-      LeafPage leafPage = new LeafPage();
+      LeafPage leafPage = new LeafPage(this);
       leafPage.insert(key, value);
       leafPageID = leafPage.pageId;
       this.pageCache.assignNewPage(leafPage);
 
       // propagate the pageID of new leaf page to parents
       int parentPageID = breadCrumbs.pop();
-      NoneLeafPage targetPage = (NoneLeafPage) this.pageCache.getPage(parentPageID, false);
-      // result {isSucceed, propagateKey}
+      NoneLeafPage targetPage = (NoneLeafPage) this.pageCache.getPage(parentPageID);
+      // result {hasToPropagate, propatationKey, propagationValue}
       int[] result = targetPage.insert(key, leafPageID);
 
       while (result[0] != 0) {
@@ -101,26 +102,27 @@ public class BTree {
         }
         int childPageID = parentPageID;
         parentPageID = breadCrumbs.pop();
-        NoneLeafPage parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID, false);
+        NoneLeafPage parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID);
         result = parentPage.insert(key, childPageID);
       }
     } else {
-      LeafPage targetPage = (LeafPage) this.pageCache.getPage(leafPageID, true);
-      // propagate the insertion of value to leaf node.
-      // TODO: この辺はもう一度propagationのロジックを各員してロジックの組み分けが必要
-      // result {isSucceed, propagateKey}
+      LeafPage targetPage = (LeafPage) this.pageCache.getPage(leafPageID);
+      // result {hasToPropagate, propatationKey, propagationValue}
       int[] result = targetPage.insert(key, value);
-      int parentPageID = targetPage.pageId;
-      while (result[0] != 0) {
-        key = result[1];
-        if (breadCrumbs.size() == 0) {
-          System.out.println("have to split root");
-        }
-        int childPageID = parentPageID;
-        parentPageID = breadCrumbs.pop();
-        NoneLeafPage parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID, false);
-        result = parentPage.insert(key, childPageID);
+      // propagate the insertion of value to leaf node.
+      while (result[0] != 0 && !breadCrumbs.empty()) {
+        int parentPageID = breadCrumbs.pop();
+        int propagatingKey = result[1];
+        int propagatingPageID = result[2];
+        System.out.println(parentPageID);
+        NoneLeafPage parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID);
+        result = parentPage.insert(propagatingKey, propagatingPageID);
       }
+
+      if (result[0] != 0) {
+        throw new IllegalStateException("have to split root");
+      }
+
     }
     logger.info("finished insert (key, value) = " + "(" + key + ", " + value + ")");
   }
@@ -128,8 +130,8 @@ public class BTree {
   public int read(int key) {
     logger.info("start read (key) = " + "(" + key + ")");
     int leafPageID = this.getLeafPage(key);
-    System.out.println("leafPageID : " + leafPageID);
-    LeafPage page = (LeafPage) this.pageCache.getPage(leafPageID, true);
+    logger.info("the key was found on the LeafPage(pageID = " + leafPageID + ")");
+    LeafPage page = (LeafPage) this.pageCache.getPage(leafPageID);
     int value = page.getValue(key);
     logger.info("finish read (key, value) = " + "(" + key + ", " + value + ")");
     return value;
@@ -138,7 +140,6 @@ public class BTree {
   // TODO: refine erro handling
   public static byte[] getPageBinary(String indexName, int pageID) {
     int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE * pageID;
-    System.out.println("from : " + from);
     try {
       return FileStorage.readFile(indexName, from, BTree.PAGE_SIZE);
     } catch (IOException e) {
@@ -147,37 +148,58 @@ public class BTree {
     return null;
   }
 
-  public static int assignPageId() {
-    // やはり、tree headerに使用済みのページを管理する必要がある？
-    // 一旦メモリ上で実現しておく
-    int pageID = avaliablePageIds.pop();
-    logger.debug("new pageID is assigned : " + pageID);
+  public int assignPageId(Page page) {
+    int pageID = this.tailer.assignNewPageID();
+    this.header.isLeaf.put(pageID, page instanceof LeafPage);
     return pageID;
   }
 
   private int getLeafPage(int key) {
     int pageId = BTree.ROOT_PAGE_ID;
-    int childPageId = 0;
-    while (pageId != -1 && !this.isLeafNode(pageId)) {
-      NoneLeafPage page = null;
-      page = (NoneLeafPage) this.pageCache.getPage(pageId, false);
-      childPageId = page.getChildPageId(key);
-      pageId = childPageId;
+    while (pageId != -1) {
+      Page page = this.pageCache.getPage(pageId);
+      if (page instanceof LeafPage) {
+        break;
+      }
+      pageId = page.getChildPageId(key);
     }
+
+    // int childPageId = 0;
+    // while (pageId != -1 && !this.isLeafNode(pageId)) {
+    // NoneLeafPage page = null;
+    // page = (NoneLeafPage) this.pageCache.getPage(pageId, false);
+    // childPageId = page.getChildPageId(key);
+    // pageId = childPageId;
+    // }
     return pageId;
   }
 
+  // private void getLeafPageIDWithBreadCrumbs(int key, Stack<Integer> breadCrumbs) {
+  // int pageId = BTree.ROOT_PAGE_ID;
+  // while (pageId != -1 && !this.isLeafNode(pageId)) {
+  // breadCrumbs.add(pageId);
+  // NoneLeafPage page = null;
+  // page = (NoneLeafPage) this.pageCache.getPage(pageId, false);
+  // pageId = page.getChildPageId(key);
+  // }
+  // breadCrumbs.add(pageId);
+  // }
+
   private void getLeafPageIDWithBreadCrumbs(int key, Stack<Integer> breadCrumbs) {
     int pageId = BTree.ROOT_PAGE_ID;
-    while (pageId != -1 && !this.isLeafNode(pageId)) {
+    while (pageId != -1) {
+      Page page = this.pageCache.getPage(pageId);
       breadCrumbs.add(pageId);
-      NoneLeafPage page = null;
-      page = (NoneLeafPage) this.pageCache.getPage(pageId, false);
+      if (page instanceof LeafPage) {
+        break;
+      }
       pageId = page.getChildPageId(key);
     }
-    breadCrumbs.add(pageId);
-  }
+    if (pageId == -1) {
+      breadCrumbs.add(pageId);
+    }
 
+  }
 
   // pageでisleaf情報を確認すると余計な管理とI/Oの増加が予想されるので、btreeのheaderで対応する
   private boolean isLeafNode(int pageID) {
