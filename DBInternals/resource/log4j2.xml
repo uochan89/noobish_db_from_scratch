@@ -5,7 +5,7 @@
       <!-- <RegexFilter regex=".* [main] .*" onMatch="ACCEPT" onMismatch="DENY"/> -->  
       <PatternLayout pattern="%highlight{%d [%t] %-5level: %msg%n%throwable}" />
     </Console>
-    <File name="MyFile" fileName="logs/myapp-${date:yyyy-MM-ddHHmm}.log">
+    <File name="MyFile" fileName="logs.nosync/myapp-${date:yyyy-MM-ddHHmm}.log">
       <!-- <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/> -->
       <PatternLayout pattern="%highlight{%d [%t] %-5level: %msg%n%throwable}" />
     </File>

@@ -58,7 +58,7 @@ public class KeyValueCell {
     return this.value;
   }
 
-  public Integer getKey() {
+  public int getKey() {
     return this.key;
   }
 

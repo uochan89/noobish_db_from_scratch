@@ -10,7 +10,7 @@ public abstract class Page {
 
   public abstract int getChildPageId(int key);
 
-  public static boolean isLeafPage(int pageID, byte[] pageBinary) {
+  public static boolean isLeafPage(byte[] pageBinary) {
     return new PageHeader(pageBinary).isLeafPage;
   }
 }

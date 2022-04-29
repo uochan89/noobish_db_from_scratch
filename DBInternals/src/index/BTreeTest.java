@@ -41,8 +41,7 @@ class BTreeTest {
 
   @Test
   void testMultipleInsertAndRead() {
-    Random rand = new Random();
-    // generate keys
+    // generate random params
     List<Integer> keys = new ArrayList<Integer>();
     for (int i = 0; i < 100; i++) {
       keys.add(i);
@@ -51,10 +50,8 @@ class BTreeTest {
 
     for (int i = 0; i < 100; i++) {
       int key = keys.get(i);
-      int value = rand.nextInt((int) Math.pow(2, 31));
-      System.out.println("testing kv : " + key + ", " + value);
-      tree.insert(key, value);
-      assertEquals(value, tree.read(key));
+      tree.insert(key, key);
+      assertEquals(key, tree.read(key));
     }
 
   }
@@ -102,16 +99,74 @@ class BTreeTest {
     }
   }
 
+  // dame
   @Test
-  void testInsertAndReadWithSplit() {
-    for (int key = 1999; key >= 0; key--) {
+  void testInsertAndReadWithOnlyLeafPageSplit() {
+    for (int key = 5000; key >= 0; key--) {
       int value = key;
       tree.insert(key, value);
     }
-    System.out.println("inserted 2000 data");
-    for (int key = 0; key < 2000; key++) {
+    /**
+     * try { Thread.sleep(6000); } catch (InterruptedException e) { e.printStackTrace(); }
+     */
+    for (int key = 0; key < 5000; key++) {
       assertEquals(key, tree.read(key));
     }
   }
 
+  @Test
+  void testInsertAndReadWithRootNoneLeafPageSplit() {
+    for (int key = 20000; key >= 0; key--) {
+      int value = key;
+      tree.insert(key, value);
+    }
+    try {
+        Thread.sleep(7000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    for (int key = 0; key <= 20000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
+  
+  @Test
+  void testInsertAndReadWithInternalNoneLeafPageSplit() {
+    for (int key = 111000; key >= 0; key--) {
+      int value = key;
+      tree.insert(key, value);
+    }
+    try {
+        Thread.sleep(7000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    for (int key = 0; key <= 111000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
+  
+  //ランダムな数字を入れるケース
+  @Test
+  void testRandomInsertAndRead() {
+	  System.out.println("test start");
+	//create random parameter
+	ArrayList<Integer> param = new ArrayList<Integer>();
+    for(int i = 0 ; i <= 2000 ; i++) {
+    	param.add(i);
+    }
+    Collections.shuffle(param);
+    
+    for(int v : param) {
+    	tree.insert(v, v);
+    }
+    try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    for (int key = 0; key <= 2000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
 }

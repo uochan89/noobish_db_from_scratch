@@ -8,12 +8,11 @@ import others.BinaryUtil;
 public class PageHeader {
 
   // offsets of fixed-sized variables
-  private static final int PAGE_ID = 4;
   private static final int PAGE_SIZE = 4000;
   private static final int OFFSET_COUNT = 4;
 
   // header members
-  public int pageID;
+  // public int pageID;
   public int offsetCount;
 
   // members that would be needed

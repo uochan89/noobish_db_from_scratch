@@ -20,7 +20,7 @@ public class NoneLeafPage extends Page {
   private static final int HEADER_SIZE = 10;
   private PageHeader header;
   // offset, KeyValueCell
-  private KeyValueCellMap keyValueCellMap;
+  public KeyValueCellMap keyValueCellMap;
   private List<Integer> offsets;
   private BTree btree;
 
@@ -32,23 +32,27 @@ public class NoneLeafPage extends Page {
     this.btree = btree;
     this.header = new PageHeader();
     this.header.isLeafPage = false;
-    this.pageId = this.btree.assignPageId(this);
+    super.pageId = this.btree.assignPageId(this);
+    // this.header.pageID = super.pageId;
     this.keyValueCellMap =
         new KeyValueCellMap(NoneLeafPage.PAGE_SIZE - this.header.tmp_header_offset);
     this.offsets = new ArrayList<Integer>();
+    this.btree.pageCache.assignNewPage(this);
   }
 
-  public NoneLeafPage(byte[] pageBinary, BTree btree) {
+  public NoneLeafPage(byte[] pageBinary, BTree btree, int pageID) {
+    this.pageId = pageID;
     // parse header
     this.header = new PageHeader(pageBinary);
     this.btree = btree;
     // tree map 使うのがよくね？ value でソートさせる必要がある？ 逆転すればいいだけ？ ー＞微妙。pointerのbeautyが見えにくくなる
     // parse offsets
     this.offsets = new ArrayList<Integer>();
+    int t = this.header.tmp_header_offset;
     for (int i = 0; i < this.header.offsetCount; i++) {
-      int t = this.header.tmp_header_offset;
       byte[] offset = Arrays.copyOfRange(pageBinary, t, t + NoneLeafPage.OFFSET_SIZE);
       this.offsets.add(BinaryUtil.bytesToInt(offset));
+      System.out.println(BinaryUtil.bytesToInt(offset));
       t += NoneLeafPage.OFFSET_SIZE;
     }
 
@@ -62,19 +66,24 @@ public class NoneLeafPage extends Page {
     }
   }
 
+  /**
+   * 
+   * @return KeyValueCellの昇順でのそのoffsetを並べたリストを返す
+   */
   private List<Integer> getSortedOffset() {
     List<Integer> sortedOffsets = new ArrayList<Integer>();
-    Integer key = this.keyValueCellMap.firstKey();
-    //
-    int offset_value = NoneLeafPage.PAGE_SIZE - 1;
-    while (true) {
-      KeyValueCell cell = this.keyValueCellMap.get(key);
-      offset_value -= cell.getBinary().length;
-      sortedOffsets.add(offset_value);
-      // get next key
-      key = this.keyValueCellMap.higherKey(key);
-      if (key == null) {
-        break;
+    if (this.keyValueCellMap.size() != 0) {
+      Integer key = this.keyValueCellMap.firstKey();
+      int offset_value = NoneLeafPage.PAGE_SIZE - 1;
+      while (true) {
+        KeyValueCell cell = this.keyValueCellMap.get(key);
+        offset_value -= cell.getBinary().length;
+        sortedOffsets.add(offset_value);
+        // get next key
+        key = this.keyValueCellMap.higherKey(key);
+        if (key == null) {
+          break;
+        }
       }
     }
     return sortedOffsets;
@@ -87,7 +96,7 @@ public class NoneLeafPage extends Page {
 
     // add header
     byte[] headerBinary = this.header.getBinary();
-    for (int i = 0; i < this.header.tmp_header_offset; i++) {
+    for (int i = 0; i < headerBinary.length; i++) {
       binary[i] = headerBinary[i];
     }
 
@@ -95,6 +104,7 @@ public class NoneLeafPage extends Page {
     int i_offset = this.header.tmp_header_offset;
     List<Integer> sortedOffsets = this.getSortedOffset();
     for (int offset : sortedOffsets) {
+      // TODO can be a bug. thought offset is fixed size.
       byte[] b = BinaryUtil.intToBytes(offset);
       for (int i = 0; i < b.length; i++) {
         binary[i_offset + i] = b[i];
@@ -103,22 +113,24 @@ public class NoneLeafPage extends Page {
     }
 
     // add keyValue
-    int i_cell = this.header.free_space_right_index - 1;
-    Integer key = this.keyValueCellMap.firstKey();
-    while (true) {
-      KeyValueCell cell = this.keyValueCellMap.get(key);
-      byte[] cellBinary = cell.getBinary();
-      int t = i_cell - cellBinary.length + 1;
-      for (byte b : cellBinary) {
-        binary[t] = b;
-        t += 1;
-      }
-      i_cell -= cellBinary.length;
+    int cell_end_index = this.header.free_space_right_index - 1;
+    if (this.keyValueCellMap.size() != 0) {
+      Integer key = this.keyValueCellMap.firstKey();
+      while (true) {
+        KeyValueCell cell = this.keyValueCellMap.get(key);
+        byte[] cellBinary = cell.getBinary();
+        int cell_start_index = cell_end_index - cellBinary.length + 1;
+        for (byte b : cellBinary) {
+          binary[cell_start_index] = b;
+          cell_start_index += 1;
+        }
+        cell_end_index -= cellBinary.length;
 
-      // get next key
-      key = this.keyValueCellMap.higherKey(key);
-      if (key == null) {
-        break;
+        // get next key
+        key = this.keyValueCellMap.higherKey(key);
+        if (key == null) {
+          break;
+        }
       }
     }
 
@@ -143,58 +155,106 @@ public class NoneLeafPage extends Page {
     }
   }
 
-  public int createChildLeafNode(int key) {
-    LeafPage leafPage = new LeafPage();
-    int pageId = leafPage.pageId;
-    KeyValueCell cell = new KeyValueCell(key, pageId);
-    this.keyValueCellMap.put(key, cell);
-    this.offsets.add(this.header.free_space_right_index - cell.getBinary().length);
-    return pageId;
-  }
-
   public int[] insert(int key, int pageID) {
     logger.debug("insert kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
 
     KeyValueCell cell = new KeyValueCell(key, pageID);
 
-    // check if new kv is insertable without splitting the page.
-    boolean hasEnoughSpace = true;
-
     // update offset and celllist
-    if (hasEnoughSpace) {
+    if (this.keyValueCellMap.hasEnoughSpace(key, pageID)) {
       this.header.cell_start_offset -= cell.getBinary().length;
       this.offsets.add(this.header.cell_start_offset);
       this.header.offsetCount += 1;
       Collections.sort(this.offsets);
       this.keyValueCellMap.add(cell);
+      //TODO: おそらくinsertによるrightmostpageIDの境界の変更とsplit時の対応が何も考えられていない
       if (this.header.getRightMostPageID() == 0) {
-        // これあってる？
         this.header.setRightMostPageID(this.btree.assignPageId(this));
       }
-      // TODO : do i have to sava pageid to storage?
       logger.debug(
           "insert completed for kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
       return new int[] {0};
     } else {
-      int[] propatationInf = this.splitPage(key, pageID);
-      return new int[] {-1, propatationInf[0], propatationInf[1]};
+      if(this.pageId == 0) {
+    	  int[] newPageIDs = this.splitAsRootPage();
+    	  NoneLeafPage leftHalfPage = (NoneLeafPage) this.btree.pageCache.getPage(newPageIDs[0]);
+    	  leftHalfPage.insert(key, pageID);
+    	  return new int[] {0};
+      }else {
+    	  logger.fatal("no more space in None Leaf Page start splitting");
+    	  int[] propagationInf = this.splitAndDeleteHalfPage();
+    	  NoneLeafPage newPage = (NoneLeafPage) this.btree.pageCache.getPage(propagationInf[1]);
+    	  newPage.insert(key, pageID);
+          logger.debug("splited page new partition key : " + propagationInf[0] + " new pageID :"
+              + propagationInf[1]);
+          return new int[] {-1, propagationInf[0], propagationInf[1]};
+      }
     }
   }
 
-  private int[] splitPage(int key, int value) {
-    NoneLeafPage newPage = new NoneLeafPage();
+  public int[] splitAsRootPage() {
+    int[] prpgtInfLeft = this.splitLeftHalfPage();
+    int[] prpgtInfRight = this.splitRightHalfPage();
+    // NoneLeafPageを新規作成
+    NoneLeafPage rootPage = new NoneLeafPage(this.btree);
+    // pageID = 0としてcacheを更新
+    rootPage.pageId = 0;
+    rootPage.btree.pageCache.assignNewPage(rootPage);
+    // root pageに上の情報を入れる。
+    rootPage.insert(prpgtInfLeft[0], prpgtInfLeft[1]);
+    rootPage.insert(prpgtInfRight[0], prpgtInfRight[1]);
+
+    return new int[] {prpgtInfLeft[1], prpgtInfRight[1]};
+  }
+
+  public int[] splitAndDeleteHalfPage() {
+    NoneLeafPage newPage = new NoneLeafPage(this.btree);
+
+    int propagatingKey = this.keyValueCellMap.firstKey();
+    int originalKVSize = this.keyValueCellMap.size();
+    logger.debug("NoneLeafPage, splitAndDeleteHalfPage");
+    int loop_size = originalKVSize / 2;
+    for (int i = 0; i < originalKVSize / 2; i++) {
+      newPage.insert(propagatingKey, this.keyValueCellMap.get(propagatingKey).getValue());
+      
+      //insert時と逆の同じ操作をする
+      this.offsets.remove(this.offsets.indexOf(this.header.cell_start_offset));
+      this.header.cell_start_offset += this.keyValueCellMap.get(propagatingKey).getBinary().length;
+      this.header.offsetCount -= 1;
+      this.keyValueCellMap.remove(propagatingKey);
+      if (i != loop_size - 1) {
+    	  propagatingKey = this.keyValueCellMap.higherKey(propagatingKey);
+      }
+    }
+    return new int[] {propagatingKey, newPage.pageId};
+  }
+
+  private int[] splitLeftHalfPage() {
+    NoneLeafPage newPage = new NoneLeafPage(this.btree);
+    this.btree.pageCache.assignNewPage(newPage);
+
+    NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
+    Integer propagatingKey = naviMap.last();
+    for (int i = 0; i < naviMap.size() / 2; i++) {
+      newPage.insert(propagatingKey, this.keyValueCellMap.get(propagatingKey).getValue());
+      propagatingKey = naviMap.lower(propagatingKey);
+    }
+    return new int[] {naviMap.higher(propagatingKey), newPage.pageId};
+  }
+
+  private int[] splitRightHalfPage() {
+    NoneLeafPage newPage = new NoneLeafPage(this.btree);
+    this.btree.pageCache.assignNewPage(newPage);
 
     NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
     int propagatingKey = naviMap.first();
-    int mapKey = propagatingKey;
-    for (int i = 0; i < naviMap.size() / 2; i++) {
-      newPage.insert(mapKey, this.keyValueCellMap.get(mapKey).getValue());
-      mapKey = naviMap.higher(mapKey);
+    for (int i = naviMap.size() / 2; i < naviMap.size(); i++) {
+      newPage.insert(propagatingKey, this.keyValueCellMap.get(propagatingKey).getValue());
+      propagatingKey = naviMap.higher(propagatingKey);
     }
-
-    return new int[] {propagatingKey, newPage.pageId};
-
+    return new int[] {this.keyValueCellMap.lastKey(), newPage.pageId};
   }
+
 
 
 }

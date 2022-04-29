@@ -57,32 +57,39 @@ public class PageCache {
             // cacheをtree毎に作成するかどうか。index間で共有するならkeyをpageID以外にしないといけない
             byte[] pageBinary = BTree.getPageBinary(key.key1, key.key2);
             Page cachingPage = null;
-            if (Page.isLeafPage(key.key2, pageBinary)) {
-              cachingPage = new LeafPage(pageBinary, btree);
+            if (Page.isLeafPage(pageBinary)) {
+              cachingPage = new LeafPage(pageBinary, btree, key.key2);
             } else {
-              cachingPage = new NoneLeafPage(pageBinary, btree);
+              cachingPage = new NoneLeafPage(pageBinary, btree, key.key2);
             }
             logger.debug("cached page from storage with pageID : " + key.key2);
             return cachingPage;
           }
         };
 
-    RemovalListener listener = new RemovalListener<PageCacheKey<String, Integer>, Page>() {
-      @Override
-      public void onRemoval(RemovalNotification<PageCacheKey<String, Integer>, Page> notification) {
-        String indexName = notification.getKey().key1;
-        byte[] pageBinary = notification.getValue().getBinary();
-        int pageID = notification.getKey().key2;
-        try {
-          FileStorage.updateFile(indexName, pageBinary, BTree.getPageIdOffset(pageID));
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-        logger.debug("removed page from cache with pageID : " + pageID);
-      }
-    };
+    RemovalListener<PageCacheKey<String, Integer>, Page> listener =
+        new RemovalListener<PageCacheKey<String, Integer>, Page>() {
+          @Override
+          public void onRemoval(
+              RemovalNotification<PageCacheKey<String, Integer>, Page> notification) {
+            logger.debug("evacuate page of key : {treeName : " + notification.getKey().key1
+                + ", pageID : " + notification.getKey().key2 + "}");
+            String indexName = notification.getKey().key1;
+            byte[] pageBinary = notification.getValue().getBinary();
+            int pageID = notification.getKey().key2;
+            if (pageID == 0) {
+              System.out.println("omega");
+            }
+            try {
+              FileStorage.updateFile(indexName, pageBinary, BTree.getPageIdOffset(pageID));
+            } catch (IOException e) {
+              e.printStackTrace();
+            }
+            logger.debug("evacuated page of pageID : " + pageID);
+          }
+        };
 
-    cache = CacheBuilder.newBuilder().expireAfterAccess(100, TimeUnit.SECONDS)
+    cache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS)
         .removalListener(listener).build(loader);
   }
 
@@ -90,6 +97,9 @@ public class PageCache {
     PageCacheKey<String, Integer> key =
         new PageCacheKey<String, Integer>(this.treeName, page.pageId);
     this.cache.put(key, page);
+    logger.debug("assigned page to cache with key : {treeName : " + this.treeName
+        + ", page.pageId : " + page.pageId + "}");
+
   }
 
   public void savePageToStorage(int pageID) {
@@ -106,6 +116,7 @@ public class PageCache {
 
   public Page getPage(int pageID) {
     PageCacheKey<String, Integer> key = new PageCacheKey<String, Integer>(this.treeName, pageID);
+    logger.debug("getPage from PageCache with key : {" + key.key1 + ", " + key.key2 + "}");
     try {
       return this.cache.get(key);
     } catch (ExecutionException e) {

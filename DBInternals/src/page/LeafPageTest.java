@@ -61,4 +61,29 @@ class LeafPageTest {
     assertEquals(20, page.getValue(10));
   }
 
+  @Test
+  void testSplitPage() {
+    for (int i = 200; i > 0; i--) {
+      tree.insert(i, i);
+    }
+//    try {
+//      Thread.sleep(7000);
+//    } catch (InterruptedException e) {
+//      e.printStackTrace();
+//    }
+    System.out.println("insert and wait finished");
+    LeafPage originalLeafPage = (LeafPage) tree.pageCache.getPage(1);
+    LeafPage newLeafPage = (LeafPage) tree.pageCache.getPage(3);
+    NoneLeafPage root = (NoneLeafPage) tree.pageCache.getPage(0);
+    for (int i = 200; i > 0; i--) {
+        assertEquals(i, tree.read(i));
+      }
+    System.out.println(tree.read(199));
+
+    // offsetの編集がされていないのが問題だと思われる
+    // offsetは更新されていないが、readの時にはしようされていないので、今回のエラーには直接関係ないのでは？
+
+
+  }
+
 }

@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -82,6 +84,7 @@ public class BTree {
     this.getLeafPageIDWithBreadCrumbs(key, breadCrumbs);
 
     int leafPageID = breadCrumbs.pop();
+    // when there is no leafPage
     if (leafPageID == -1) {
       // TODO: assign kv to leaf page herez
       LeafPage leafPage = new LeafPage(this);
@@ -109,19 +112,18 @@ public class BTree {
       LeafPage targetPage = (LeafPage) this.pageCache.getPage(leafPageID);
       // result {hasToPropagate, propatationKey, propagationValue}
       int[] result = targetPage.insert(key, value);
-      // propagate the insertion of value to leaf node.
+      // propagate the insertion of value to leaf node to upper nodes if necessary.
+      NoneLeafPage parentPage = null;
       while (result[0] != 0 && !breadCrumbs.empty()) {
         int parentPageID = breadCrumbs.pop();
         int propagatingKey = result[1];
         int propagatingPageID = result[2];
         System.out.println(parentPageID);
-        NoneLeafPage parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID);
+        parentPage = (NoneLeafPage) this.pageCache.getPage(parentPageID);
         result = parentPage.insert(propagatingKey, propagatingPageID);
       }
 
-      if (result[0] != 0) {
-        throw new IllegalStateException("have to split root");
-      }
+      //TODO: rootnodeを分割する場合と、ただNoneLeadNodeを分割してrootNodeに追加する場合の区別ができていない気がする
 
     }
     logger.info("finished insert (key, value) = " + "(" + key + ", " + value + ")");
@@ -129,8 +131,15 @@ public class BTree {
 
   public int read(int key) {
     logger.info("start read (key) = " + "(" + key + ")");
-    int leafPageID = this.getLeafPage(key);
-    logger.info("the key was found on the LeafPage(pageID = " + leafPageID + ")");
+    List<Integer> leafPageRoute = this.getLeafPageRoute(key);
+    int leafPageID = leafPageRoute.get(leafPageRoute.size() - 1);
+    StringBuilder sb = new StringBuilder();
+    for (Integer pageID : leafPageRoute) {
+      sb.append(pageID);
+      sb.append(", ");
+    }
+    String routeToLeaf = sb.toString();
+    logger.info("the route to leafPage : " + routeToLeaf.substring(0, routeToLeaf.length() - 2));
     LeafPage page = (LeafPage) this.pageCache.getPage(leafPageID);
     int value = page.getValue(key);
     logger.info("finish read (key, value) = " + "(" + key + ", " + value + ")");
@@ -139,6 +148,7 @@ public class BTree {
 
   // TODO: refine erro handling
   public static byte[] getPageBinary(String indexName, int pageID) {
+    logger.debug("get pageID : " + pageID + " from storage");
     int from = BTree.HEADER_SIZE + BTree.PAGE_SIZE * pageID;
     try {
       return FileStorage.readFile(indexName, from, BTree.PAGE_SIZE);
@@ -154,10 +164,12 @@ public class BTree {
     return pageID;
   }
 
-  private int getLeafPage(int key) {
+  private List<Integer> getLeafPageRoute(int key) {
+    List<Integer> leafPageRoute = new ArrayList<Integer>();
     int pageId = BTree.ROOT_PAGE_ID;
     while (pageId != -1) {
       Page page = this.pageCache.getPage(pageId);
+      leafPageRoute.add(pageId);
       if (page instanceof LeafPage) {
         break;
       }
@@ -171,7 +183,7 @@ public class BTree {
     // childPageId = page.getChildPageId(key);
     // pageId = childPageId;
     // }
-    return pageId;
+    return leafPageRoute;
   }
 
   // private void getLeafPageIDWithBreadCrumbs(int key, Stack<Integer> breadCrumbs) {
@@ -186,6 +198,7 @@ public class BTree {
   // }
 
   private void getLeafPageIDWithBreadCrumbs(int key, Stack<Integer> breadCrumbs) {
+    logger.info("start getLeafPageIDWithBreadCrumbs");
     int pageId = BTree.ROOT_PAGE_ID;
     while (pageId != -1) {
       Page page = this.pageCache.getPage(pageId);
@@ -198,7 +211,7 @@ public class BTree {
     if (pageId == -1) {
       breadCrumbs.add(pageId);
     }
-
+    logger.info("finished getLeafPageIDWithBreadCrumbs : " + breadCrumbs.toString());
   }
 
   // pageでisleaf情報を確認すると余計な管理とI/Oの増加が予想されるので、btreeのheaderで対応する

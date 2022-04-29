@@ -1,10 +1,10 @@
 package page;
 
+import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-@SuppressWarnings("serial")
 // TODO:こういうことしていいんだっけjavaAPIの本を見ればわかる。既存ライブラリの拡張のところ
 public class KeyValueCellMap {
 
@@ -40,7 +40,7 @@ public class KeyValueCellMap {
   public void remove(int key) {
     KeyValueCell cell = this.keyCellMap.get(key);
     this.free_space += OFFSET_SIZE;
-    this.free_space -= cell.getBinary().length;
+    this.free_space += cell.getBinary().length;
     this.keyCellMap.remove(key);
   }
 
@@ -60,13 +60,20 @@ public class KeyValueCellMap {
     return kvMap;
   }
 
-
   public Integer firstKey() {
     return this.keyCellMap.firstKey();
   }
 
+  public Integer lastKey() {
+    return this.keyCellMap.lastKey();
+  }
+
   public Integer higherKey(Integer key) {
     return this.keyCellMap.higherKey(key);
+  }
+
+  public Integer lowerKey(Integer key) {
+    return this.keyCellMap.lowerKey(key);
   }
 
   public KeyValueCell get(Integer key) {
@@ -77,5 +84,20 @@ public class KeyValueCellMap {
     return this.keyCellMap.ceilingKey(key);
   }
 
+  public int size() {
+    return this.keyCellMap.size();
+  }
+
+@Override
+public String toString() {
+	StringBuilder sb = new StringBuilder();
+	for (Entry<Integer, KeyValueCell> entry : this.keyCellMap.entrySet()) {
+		// TODO: maybe i can output pageid instead
+	     sb.append("Key: " + entry.getKey() + ". Value: " + entry.getValue());
+	}
+	return sb.toString();
+}
+  
+  
 
 }

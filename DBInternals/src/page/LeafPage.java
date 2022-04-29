@@ -9,6 +9,8 @@ import java.util.NavigableSet;
 import java.util.TreeMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.common.returnsreceiver.qual.This;
+
 import index.BTree;
 import others.BinaryUtil;
 
@@ -35,16 +37,12 @@ public class LeafPage extends Page {
     super.pageId = this.btree.assignPageId(this);
     this.keyValueCellMap = new KeyValueCellMap(Page.PAGE_SIZE - this.header.tmp_header_offset);
     this.offsets = new ArrayList<Integer>();
-    logger.debug("created a new LeafPage with pageID : " + super.pageId);
+    this.btree.pageCache.assignNewPage(this);
+    logger.debug("Created a new LeafPage with pageID : " + super.pageId);
   }
 
-  // constructor for splitting
-  public LeafPage(Map<Integer, KeyValueCell> kvMap) {
-    this.kvMap = kvMap;
-    // TODO: initialize other stuff
-  }
-
-  public LeafPage(byte[] pageBinary, BTree btree) {
+  public LeafPage(byte[] pageBinary, BTree btree, int pageID) {
+    this.pageId = pageID;
     // parse header
     this.header = new PageHeader(pageBinary);
     this.btree = btree;
@@ -66,28 +64,6 @@ public class LeafPage extends Page {
     }
   }
 
-  public void propagateSplits() {
-    // p.40を参考に実装する
-    int propagatingKey = offsets.get(offsets.size() / 2);
-
-    List<KeyValueCell> rightKeyValueCells = new ArrayList<KeyValueCell>();
-    for (int i = 0; i < PAGE_SIZE - propagatingKey; i++) {
-      rightKeyValueCells.add(this.keyValueCellMap.get(i + propagatingKey));
-      this.keyValueCellMap.remove(i + propagatingKey);
-    }
-    // この操作でバグは発生しないのか？
-    LeafPage rightPage = new LeafPage(keyValueCellMap);
-
-    // 新しいキーの左側に対してもともとあった葉を紐づける
-    NoneLeafPage parentPage = new NoneLeafPage(this.header.parentPageId);
-    parentPage.insert(propagatingKey, this.pageId);
-
-    // 新しいキーの右側に、右側の葉を紐づける
-
-
-  }
-
-
   // It needs to be confirmed that this page is leaf node beforehand.
   // connect pointer of this object to parent none leaf node.
   public int[] insert(int key, int value) {
@@ -106,7 +82,7 @@ public class LeafPage extends Page {
           "inserted (key, value) = " + "(" + key + ", " + value + ") to pageID : " + super.pageId);
       return new int[] {0};
     } else {
-      logger.debug("no more space in page start splitting");
+      logger.debug("no more space in leaf page start splitting");
       int[] propagationInf = this.splitPage(key, value);
       logger.debug("splited page new partition key : " + propagationInf[0] + " new pageID :"
           + propagationInf[1]);
@@ -122,13 +98,51 @@ public class LeafPage extends Page {
     NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
     int propagatingKey = naviMap.last();
     for (int i = 0; i < naviMap.size() / 2; i++) {
+      // 削除する必要がある
       newPage.insert(propagatingKey, this.keyValueCellMap.get(propagatingKey).getValue());
-      propagatingKey = naviMap.lower(propagatingKey);
+      int next_propagatingKey = naviMap.lower(propagatingKey);
+      propagatingKey = next_propagatingKey;
     }
-    return new int[] {naviMap.higher(propagatingKey), newPage.pageId};
+
+    int determined_propagatingKey = naviMap.higher(propagatingKey);
+
+    // TODO: there must be better implementation
+    propagatingKey = naviMap.last();
+    int initialNaviMapSize = naviMap.size();
+    for (int i = 0; i < initialNaviMapSize / 2; i++) {
+      // 削除する必要がある
+      int next_propagatingKey = naviMap.lower(propagatingKey);
+      // insert時更新プロパティの戻し
+      this.offsets.remove(this.offsets.indexOf(this.header.cell_start_offset));
+      this.header.cell_start_offset += this.keyValueCellMap.get(propagatingKey).getBinary().length;
+      this.header.offsetCount -= 1;
+      
+      this.keyValueCellMap.remove(propagatingKey);
+      propagatingKey = next_propagatingKey;
+    }
+    Collections.sort(this.offsets);
+
+    // TODO offsetについてもここで編集する必要がある
+    // てかなんでoffsetが重要なんだっけ？
+    // どう実装する？
+    // 別のpageに移動したcell分のoffsetを削除する
+    // 本当にこれでいいんだっけ？これはoffsettがソート さrているという前提をおいているけど
+//    List<Integer> newOffsets = new ArrayList<Integer>();
+//    for (int i = 0; i < this.offsets.size()/2; i ++) {
+//    	newOffsets.add(this.offsets.get(i));
+//    }
+//    this.offsets = newOffsets;
+    // offsetはバイナリの管理のためだけにしようすればよくてjavaの中では必要ではなさそう？？？
+    
+    // insertの時に更新しているプロパティを修正する
+ // insert自体はしないといけないけど、insertするページが違っている気がする
+    
+    
+
+    // これってコピー元のやつって削除してる？
+    return new int[] {determined_propagatingKey, newPage.pageId};
   }
 
-  // TODO:insertした時にoffsetのソートが保てていないので２分探索ができていない
   public int getValue(int key) {
     return this.keyValueCellMap.get(key).getValue();
   }
@@ -136,17 +150,19 @@ public class LeafPage extends Page {
 
   private List<Integer> getSortedOffset() {
     List<Integer> sortedOffsets = new ArrayList<Integer>();
-    Integer key = this.keyValueCellMap.firstKey();
-    //
-    int offset_value = LeafPage.PAGE_SIZE - 1;
-    while (true) {
-      KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
-      offset_value -= cell.getBinary().length;
-      sortedOffsets.add(offset_value);
-      // get next key
-      key = this.keyValueCellMap.higherKey(key);
-      if (key == null) {
-        break;
+    if (this.keyValueCellMap.size() != 0) {
+      Integer key = this.keyValueCellMap.firstKey();
+      //
+      int offset_value = LeafPage.PAGE_SIZE - 1;
+      while (true) {
+        KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
+        offset_value -= cell.getBinary().length;
+        sortedOffsets.add(offset_value);
+        // get next key
+        key = this.keyValueCellMap.higherKey(key);
+        if (key == null) {
+          break;
+        }
       }
     }
     return sortedOffsets;
@@ -180,21 +196,23 @@ public class LeafPage extends Page {
 
     // add keyValue
     int i_cell = this.header.free_space_right_index - 1;
-    Integer key = this.keyValueCellMap.firstKey();
-    while (true) {
-      KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
-      byte[] cellBinary = cell.getBinary();
-      int t = i_cell - cellBinary.length + 1;
-      for (byte b : cellBinary) {
-        binary[t] = b;
-        t += 1;
-      }
-      i_cell -= cellBinary.length;
+    if (this.keyValueCellMap.size() != 0) {
+      Integer key = this.keyValueCellMap.firstKey();
+      while (true) {
+        KeyValueCell cell = (KeyValueCell) this.keyValueCellMap.get(key);
+        byte[] cellBinary = cell.getBinary();
+        int t = i_cell - cellBinary.length + 1;
+        for (byte b : cellBinary) {
+          binary[t] = b;
+          t += 1;
+        }
+        i_cell -= cellBinary.length;
 
-      // get next key
-      key = this.keyValueCellMap.higherKey(key);
-      if (key == null) {
-        break;
+        // get next key
+        key = this.keyValueCellMap.higherKey(key);
+        if (key == null) {
+          break;
+        }
       }
     }
 

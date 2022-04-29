@@ -45,7 +45,7 @@ class PageCacheTest {
   void testGetPage() {
     int pageID = 0;
     String indexName = "page_cache_test";
-    this.btree.pageCache.getPage(pageID);
+    btree.pageCache.getPage(pageID);
     PageCacheKey<String, Integer> key = new PageCacheKey<String, Integer>(indexName, pageID);
     assertNotNull(PageCacheTest.btree.pageCache.cache.getIfPresent(key));
   }
@@ -64,6 +64,21 @@ class PageCacheTest {
     NoneLeafPage anotherPage = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID);
     assertEquals(10, anotherPage.getChildPageId(3));
 
+  }
+
+  @Test
+  void testSavePageToStorage() {
+    NoneLeafPage page = new NoneLeafPage(btree);
+    int pageID = page.pageId;
+    page.insert(2, 3);
+    page = null;
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+    NoneLeafPage anotherPage = (NoneLeafPage) PageCacheTest.btree.pageCache.getPage(pageID);
+    assertEquals(3, anotherPage.keyValueCellMap.get(2).getValue());
   }
 
 }
