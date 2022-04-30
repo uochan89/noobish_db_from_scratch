@@ -140,6 +140,8 @@ public class NoneLeafPage extends Page {
 
   public int getChildPageId(int key) {
     // always connect to new pageID when searching down.
+	// 元々、rootNodeの初期状態でしかここにひっかからない予定だったが、
+	// rightmostpadeIDも初期状態は0になるのでここでひっかかってしまっている
     if (this.header.offsetCount == 0) {
       logger.debug("No Child Node pageID : " + super.pageId);
       return -1;
@@ -169,30 +171,56 @@ public class NoneLeafPage extends Page {
       this.keyValueCellMap.add(cell);
       //TODO: おそらくinsertによるrightmostpageIDの境界の変更とsplit時の対応が何も考えられていない
       if (this.header.getRightMostPageID() == 0) {
-        this.header.setRightMostPageID(this.btree.assignPageId(this));
+    	//TODO: assignするpageオブジェクトが謝っている。これは常にleaf? noneleaf?
+    	LeafPage rightMostPage = new LeafPage(this.btree);
+        this.header.setRightMostPageID(rightMostPage.pageId);
+        logger.debug("created right msot");
+        logger.debug(rightMostPage.pageId);
       }
       logger.debug(
           "insert completed for kv (" + key + " " + pageID + ") for pageID : " + super.pageId);
       return new int[] {0};
     } else {
       if(this.pageId == 0) {
-    	  int[] newPageIDs = this.splitAsRootPage();
-    	  NoneLeafPage leftHalfPage = (NoneLeafPage) this.btree.pageCache.getPage(newPageIDs[0]);
-    	  leftHalfPage.insert(key, pageID);
+    	  logger.fatal("no more space in root Page start splitting");
+    	  int[][] newPageInfs = this.splitAsRootPage();
+    	  int[] prpgtInfLeft = newPageInfs[0];
+    	  int[] prpgtInfRight = newPageInfs[1];
+    	  logger.fatal("try inserting old value");
+    	  NoneLeafPage rootPage = (NoneLeafPage) this.btree.pageCache.getPage(0);
+    	  NoneLeafPage page = null;
+    	  if(key <= prpgtInfLeft[0]) {
+    		  page = (NoneLeafPage) this.btree.pageCache.getPage(prpgtInfLeft[1]);
+    		  rootPage.insert(prpgtInfLeft[0], prpgtInfLeft[1]);
+        	  rootPage.insert(prpgtInfRight[0], prpgtInfRight[1]);
+    	  }else {
+    		  page = (NoneLeafPage) this.btree.pageCache.getPage(prpgtInfRight[1]);
+    		  rootPage.insert(prpgtInfLeft[0], prpgtInfLeft[1]);
+        	  rootPage.insert(Math.max(key, prpgtInfRight[0]), prpgtInfRight[1]);
+    	  }
+    	  page.insert(key, pageID);
+    	  // ここの新しいkeyはleafpage同様の影響をもたらすはず
+    	  // root pageに上の情報を入れる。
     	  return new int[] {0};
       }else {
     	  logger.fatal("no more space in None Leaf Page start splitting");
     	  int[] propagationInf = this.splitAndDeleteHalfPage();
-    	  NoneLeafPage newPage = (NoneLeafPage) this.btree.pageCache.getPage(propagationInf[1]);
-    	  newPage.insert(key, pageID);
-          logger.debug("splited page new partition key : " + propagationInf[0] + " new pageID :"
+    	  int propagationKey = propagationInf[0];
+    	  if(propagationKey >= key) {
+    		  propagationKey = Math.max(key, propagationKey);
+    		  NoneLeafPage newPage = (NoneLeafPage) this.btree.pageCache.getPage(propagationInf[1]);
+    		  newPage.insert(key, pageID);
+    	  }else {
+    		  this.insert(key, pageID);
+    	  }
+          logger.debug("splited page new partition key : " + propagationKey + " new pageID :"
               + propagationInf[1]);
-          return new int[] {-1, propagationInf[0], propagationInf[1]};
+          return new int[] {-1, propagationKey, propagationInf[1]};
       }
     }
   }
 
-  public int[] splitAsRootPage() {
+  public int[][] splitAsRootPage() {
     int[] prpgtInfLeft = this.splitLeftHalfPage();
     int[] prpgtInfRight = this.splitRightHalfPage();
     // NoneLeafPageを新規作成
@@ -200,11 +228,8 @@ public class NoneLeafPage extends Page {
     // pageID = 0としてcacheを更新
     rootPage.pageId = 0;
     rootPage.btree.pageCache.assignNewPage(rootPage);
-    // root pageに上の情報を入れる。
-    rootPage.insert(prpgtInfLeft[0], prpgtInfLeft[1]);
-    rootPage.insert(prpgtInfRight[0], prpgtInfRight[1]);
 
-    return new int[] {prpgtInfLeft[1], prpgtInfRight[1]};
+    return new int[][] {prpgtInfLeft, prpgtInfRight};
   }
 
   public int[] splitAndDeleteHalfPage() {

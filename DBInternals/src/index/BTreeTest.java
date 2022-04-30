@@ -106,9 +106,22 @@ class BTreeTest {
       int value = key;
       tree.insert(key, value);
     }
-    /**
-     * try { Thread.sleep(6000); } catch (InterruptedException e) { e.printStackTrace(); }
-     */
+    try {
+        Thread.sleep(7000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    for (int key = 0; key < 5000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
+  
+  @Test
+  void testInsertAndReadWithOnlyLeafPageSplitUpward() {
+    for (int key = 0; key <= 5000; key++) {
+      int value = key;
+      tree.insert(key, value);
+    }
     for (int key = 0; key < 5000; key++) {
       assertEquals(key, tree.read(key));
     }
@@ -120,10 +133,16 @@ class BTreeTest {
       int value = key;
       tree.insert(key, value);
     }
-    try {
-        Thread.sleep(7000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+    for (int key = 0; key <= 20000; key++) {
+      assertEquals(key, tree.read(key));
+    }
+  }
+  
+  @Test
+  void testInsertAndReadWithRootNoneLeafPageSplitUpward() {
+    for (int key = 0; key <= 20000; key++) {
+      int value = key;
+      tree.insert(key, value);
     }
     for (int key = 0; key <= 20000; key++) {
       assertEquals(key, tree.read(key));
@@ -132,7 +151,7 @@ class BTreeTest {
   
   @Test
   void testInsertAndReadWithInternalNoneLeafPageSplit() {
-    for (int key = 111000; key >= 0; key--) {
+    for (int key = 0; key <= 111000; key++) {
       int value = key;
       tree.insert(key, value);
     }
@@ -152,7 +171,7 @@ class BTreeTest {
 	  System.out.println("test start");
 	//create random parameter
 	ArrayList<Integer> param = new ArrayList<Integer>();
-    for(int i = 0 ; i <= 2000 ; i++) {
+    for(int i = 0 ; i <= 111000 ; i++) {
     	param.add(i);
     }
     Collections.shuffle(param);
@@ -160,13 +179,25 @@ class BTreeTest {
     for(int v : param) {
     	tree.insert(v, v);
     }
-    try {
-        Thread.sleep(5000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-    }
-    for (int key = 0; key <= 2000; key++) {
+//    try {
+//        Thread.sleep(5000);
+//      } catch (InterruptedException e) {
+//        e.printStackTrace();
+//    }
+    for (int key = 0; key <= 111000; key++) {
       assertEquals(key, tree.read(key));
     }
+  }
+  
+  @Test
+  void testInsertToRightMostPageID() {
+	  tree.insert(5, 5);
+	  tree.insert(10, 10);
+	  tree.insert(1, 1);
+	  tree.insert(12, 12);
+	  tree.insert(8, 8);
+	  System.out.println(tree.read(5));
+	  System.out.println(tree.read(10));
+	  System.out.println(tree.read(1));
   }
 }

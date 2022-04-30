@@ -84,16 +84,23 @@ public class LeafPage extends Page {
     } else {
       logger.debug("no more space in leaf page start splitting");
       int[] propagationInf = this.splitPage(key, value);
-      logger.debug("splited page new partition key : " + propagationInf[0] + " new pageID :"
+      int propagationKey = propagationInf[0];
+      if (propagationKey >= key) {
+    	  propagationKey = Math.max(key, propagationKey);
+    	  LeafPage newPage = (LeafPage) this.btree.pageCache.getPage(propagationInf[1]);
+    	  newPage.insert(key, value);
+      }else {
+    	  this.insert(key, value);
+      }
+      //int partitionKey = Math.max(propagationInf[0], key);
+      logger.debug("splited page new partition key : " + propagationKey + " new pageID :"
           + propagationInf[1]);
-      return new int[] {-1, propagationInf[0], propagationInf[1]};
+      return new int[] {-1, propagationKey, propagationInf[1]};
     }
   }
 
   private int[] splitPage(int key, int value) {
     LeafPage newPage = new LeafPage(this.btree);
-    this.btree.pageCache.assignNewPage(newPage);
-    newPage.insert(key, value);
 
     NavigableSet<Integer> naviMap = this.keyValueCellMap.descendingKeySet();
     int propagatingKey = naviMap.last();
@@ -136,8 +143,6 @@ public class LeafPage extends Page {
     
     // insertの時に更新しているプロパティを修正する
  // insert自体はしないといけないけど、insertするページが違っている気がする
-    
-    
 
     // これってコピー元のやつって削除してる？
     return new int[] {determined_propagatingKey, newPage.pageId};
